@@ -188,6 +188,12 @@ func (p *OpenAIProvider) buildRequestBody(model string, req ChatRequest, stream 
 		// Note: gpt-5.X flagship models (gpt-5.1, gpt-5.4, gpt-5.5) DO support temperature;
 		// only the mini/nano reasoning variants reject it.
 		skipTemp := strings.HasPrefix(capabilityModel, "gpt-5-mini") || strings.HasPrefix(capabilityModel, "gpt-5-nano") || strings.HasPrefix(capabilityModel, "o1") || strings.HasPrefix(capabilityModel, "o3") || strings.HasPrefix(capabilityModel, "o4")
+		// Kimi Coding rejects any temperature override — `invalid temperature: only
+		// 1 is allowed for this model`. Skip sending so the upstream applies its
+		// own default (1). Matches the model-locked behavior of o1/o3/o4.
+		if p.providerType == "kimi_coding" {
+			skipTemp = true
+		}
 		if !skipTemp {
 			body["temperature"] = v
 		}
