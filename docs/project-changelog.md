@@ -6,6 +6,18 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ## 2026-05-29
 
+### GitHub Releases update scratch dir fallback (issue #94)
+
+- Changed GitHub Releases package updates to prefer `{runtimeDir}/tmp` for
+  scratch extraction and staging, instead of deriving tmp from a release or
+  binary directory.
+- If `packages.scratch_dir` is configured but cannot be created, the update
+  executor now logs a warning and falls back to runtime tmp before failing.
+- Added regression tests for default scratch-dir selection and fallback from an
+  unusable configured scratch path.
+
+---
+
 ### CLI Credentials git preset null-env crash (issue #93)
 
 **Fixes**

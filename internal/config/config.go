@@ -72,9 +72,8 @@ type Config struct {
 // empty string → default 1h.
 //
 // ScratchDir is the tmp workspace used by the update executor for download
-// + extract + staging before atomic swap. Defaults to "{BinDir}/../tmp" when
-// empty; operators MAY set explicitly to avoid symlink-resolution issues
-// (red-team H6).
+// + extract + staging before atomic swap. Empty or unusable values fall back to
+// "{runtimeDir}/tmp"; operators MAY set an explicit writable path.
 type PackagesConfig struct {
 	GitHubToken     string `json:"github_token,omitempty"`      // Phase 2 stub
 	UpdatesCheckTTL string `json:"updates_check_ttl,omitempty"` // e.g. "1h"
