@@ -12,6 +12,7 @@ export interface MCPServerData {
   timeout_sec: number;
   settings?: {
     require_user_credentials?: boolean;
+    inject_identity?: boolean;
     tool_hints?: {
       global?: string;
       tools?: Record<string, string>;
@@ -37,6 +38,7 @@ export interface MCPServerInput {
   timeout_sec?: number;
   settings?: {
     require_user_credentials?: boolean;
+    inject_identity?: boolean;
     tool_hints?: {
       global?: string;
       tools?: Record<string, string>;

@@ -157,6 +157,20 @@ func processNormalMessage(
 		}
 	}
 
+	// --- Respond filter gate ---
+	// Per-channel-instance hybrid message filter: decides whether this message should
+	// wake the agent. Zero cost (Stage 1 only) unless mode=hybrid/classifier triggers Stage 2.
+	// Fail-open: nil mgr, nil filter, or out-of-scope → Wake.
+	if evaluateRespondGate(ctx, deps.ChannelMgr, msg.Channel, peerKind, msg.Content, agentLoop) == channels.DecisionDrop {
+		slog.Info("filter.dropped",
+			"channel", msg.Channel,
+			"peer_kind", peerKind,
+			"chat_id", msg.ChatID,
+		)
+		return
+	}
+	slog.Debug("filter.passed", "channel", msg.Channel, "peer_kind", peerKind)
+
 	// --- Quota check ---
 	if deps.QuotaChecker != nil {
 		qResult := deps.QuotaChecker.Check(ctx, userID, msg.Channel, agentLoop.ProviderName())
@@ -328,16 +342,16 @@ func processNormalMessage(
 	// to detect status queries, cancel requests, or steer/new_task for mid-run injection.
 	// Only for DM (maxConcurrent=1) where messages queue behind the active run.
 	if maxConcurrent == 1 && deps.Agents.IsSessionBusy(sessionKey) {
-		if loop, ok := agentLoop.(*agent.Loop); ok && loop.Provider() != nil {
+		if agentLoop.Provider() != nil {
 			locale := msg.Metadata["locale"]
 			if locale == "" {
 				locale = "en"
 			}
 			classifyCtx := ctx
-			if uid := loop.UUID(); uid != uuid.Nil {
+			if uid := agentLoop.UUID(); uid != uuid.Nil {
 				classifyCtx = store.WithAgentID(classifyCtx, uid)
 			}
-			intent := agent.ClassifyIntentWithUsageCaps(classifyCtx, deps.UsageCaps, loop.Provider(), loop.Model(), msg.Content)
+			intent := agent.ClassifyIntentWithUsageCaps(classifyCtx, deps.UsageCaps, agentLoop.Provider(), agentLoop.Model(), msg.Content)
 			switch intent {
 			case agent.IntentStatusQuery:
 				status := deps.Agents.GetActivity(sessionKey)

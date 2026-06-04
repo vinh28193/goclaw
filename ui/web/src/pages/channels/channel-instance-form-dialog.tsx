@@ -201,6 +201,7 @@ export function ChannelInstanceFormDialog({
       }
     }
 
+
     const cleanCreds = Object.fromEntries(
       Object.entries(credsValues).filter(([, v]) => v !== undefined && v !== "" && v !== null),
     );
@@ -244,6 +245,11 @@ export function ChannelInstanceFormDialog({
     const cleanConfig = Object.fromEntries(
       Object.entries(configValues).filter(([, v]) => v !== undefined && v !== "" && v !== null),
     );
+    // Defensive: if respond_filter was cleared (undefined), send null so backend
+    // treats it as an explicit delete regardless of merge semantics.
+    if (configValues.respond_filter === undefined) {
+      cleanConfig.respond_filter = null;
+    }
     coerceBoolSelects(cleanConfig, configSchema[channelType] ?? []);
     setLoading(true);
     setError("");

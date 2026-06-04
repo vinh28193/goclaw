@@ -313,6 +313,37 @@
       "tokopedia":   "Tokopedia"
     }
   },
+  "respondFilter": {
+    "title": "消息过滤器",
+    "help": "在转发给Agent之前过滤传入消息。关闭 = 所有消息直接通过。",
+    "mode": "模式",
+    "modes": {
+      "off": "关闭（全部通过）",
+      "regex": "正则 / 关键词",
+      "classifier": "AI分类器",
+      "hybrid": "混合（正则 + AI）"
+    },
+    "applyScope": "应用范围",
+    "applyScopes": {
+      "both": "私聊和群组",
+      "direct": "仅私聊",
+      "group": "仅群组"
+    },
+    "onNoMatch": "不匹配时",
+    "onNoMatchValues": {
+      "ignore": "静默忽略",
+      "wake": "仍然唤醒Agent"
+    },
+    "onNoMatchHint": "ignore = 静默丢弃消息（默认）；wake = 即使不匹配也调用Agent",
+    "urlDomains": "URL域名",
+    "urlDomainsHint": "每行一个域名（例如 shopee.vn）。消息包含这些域名的链接时通过。",
+    "keywords": "关键词",
+    "keywordsHint": "每行一个关键词。消息包含任意关键词时通过（不区分大小写）。",
+    "classifierModel": "分类器模型",
+    "classifierModelHint": "模型ID（例如 claude-haiku-4-5-20251001）。留空 = 使用Agent模型。",
+    "classifierPrompt": "分类器提示词",
+    "classifierPromptHint": "自定义分类器提示词。留空 = 使用内置默认提示词。"
+  },
   "groupOverrides": {
     "title": "群组和话题覆盖",
     "hint": "按群组聊天或论坛话题覆盖Channel默认值。使用 「*」 作为群组 ID 表示通配符默认值。",

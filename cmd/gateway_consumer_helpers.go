@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"mime"
 	"path/filepath"
@@ -204,4 +205,26 @@ func resolveSenderName(msg bus.InboundMessage) string {
 		}
 	}
 	return ""
+}
+
+// evaluateRespondGate runs the per-channel-instance respond filter against a message.
+// Returns DecisionWake (proceed) or DecisionDrop (discard). Always Wake when:
+//   - mgr is nil (no channel manager configured)
+//   - channel has no filter or filter does not apply to peerKind
+//
+// Fail-open: any infrastructure failure inside Evaluate returns Wake.
+func evaluateRespondGate(
+	ctx context.Context,
+	mgr *channels.Manager,
+	channel, peerKind, content string,
+	agentLoop agent.Agent,
+) channels.FilterDecision {
+	if mgr == nil {
+		return channels.DecisionWake
+	}
+	f := mgr.RespondFilter(channel)
+	if f == nil || !f.InScope(peerKind) {
+		return channels.DecisionWake
+	}
+	return f.Evaluate(ctx, content, agentLoop.Provider(), agentLoop.Model())
 }

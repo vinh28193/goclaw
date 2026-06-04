@@ -386,6 +386,37 @@
       "tokopedia":   "Tokopedia"
     }
   },
+  "respondFilter": {
+    "title": "Message Filter",
+    "help": "Filter incoming messages before routing to the agent. Off = pass all messages through.",
+    "mode": "Mode",
+    "modes": {
+      "off": "Off (pass all)",
+      "regex": "Regex / Keyword",
+      "classifier": "AI Classifier",
+      "hybrid": "Hybrid (regex + AI)"
+    },
+    "applyScope": "Apply To",
+    "applyScopes": {
+      "both": "Both DMs and groups",
+      "direct": "DMs only",
+      "group": "Groups only"
+    },
+    "onNoMatch": "On No Match",
+    "onNoMatchValues": {
+      "ignore": "Ignore (drop silently)",
+      "wake": "Wake agent anyway"
+    },
+    "onNoMatchHint": "ignore = drop the message silently (default), wake = call the agent even when no match",
+    "urlDomains": "URL Domains",
+    "urlDomainsHint": "One domain per line (e.g. shopee.vn). Message passes if it contains a link from these domains.",
+    "keywords": "Keywords",
+    "keywordsHint": "One keyword per line. Message passes if it contains any keyword (case-insensitive).",
+    "classifierModel": "Classifier Model",
+    "classifierModelHint": "Model ID (e.g. claude-haiku-4-5-20251001). Empty = use agent's model.",
+    "classifierPrompt": "Classifier Prompt",
+    "classifierPromptHint": "Custom prompt for the classifier. Empty = use built-in default."
+  },
   "groupOverrides": {
     "title": "Group & Topic Overrides",
     "hint": "Override channel defaults per group chat or forum topic. Use \"*\" as group ID for wildcard defaults.",

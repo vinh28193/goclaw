@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // PendingCompactionConfig configures LLM-based compaction of pending group messages.
 // When a group accumulates more than Threshold pending messages, older messages are
 // summarized by an LLM and replaced with a compact summary, keeping KeepRecent raw messages.
@@ -374,9 +376,12 @@ type GatewayConfig struct {
 	Quota                   *QuotaConfig `json:"quota,omitempty"`                      // per-user/group request quotas
 	BlockReply              *bool        `json:"block_reply,omitempty"`                // deliver intermediate text during tool iterations (default false)
 	ToolStatus              *bool        `json:"tool_status,omitempty"`                // show tool name in streaming preview during tool execution (default true)
-	TaskRecoveryIntervalSec int          `json:"task_recovery_interval_sec,omitempty"` // team task recovery ticker interval in seconds (default 300 = 5min)
-	BackgroundProvider      string       `json:"background_provider,omitempty"`        // LLM provider for background workers (vault enrichment, consolidation)
-	BackgroundModel         string       `json:"background_model,omitempty"`           // LLM model for background workers
+	TaskRecoveryIntervalSec int           `json:"task_recovery_interval_sec,omitempty"` // team task recovery ticker interval in seconds (default 300 = 5min)
+	BackgroundProvider      string        `json:"background_provider,omitempty"`        // LLM provider for background workers (vault enrichment, consolidation)
+	BackgroundModel         string        `json:"background_model,omitempty"`           // LLM model for background workers
+	IdentityAPIBaseURL      string        `json:"identity_api_base_url,omitempty"`      // base URL of affiliate-backend for partner identity lookup (e.g. http://localhost:8000)
+	IdentityAPIToken        string        `json:"-"`                                    // Bearer token for identity API — from env GOCLAW_IDENTITY_API_TOKEN only
+	IdentityCacheTTL        time.Duration `json:"identity_cache_ttl,omitempty"`         // partner_id cache TTL (default 5m)
 }
 
 // ToolsConfig controls tool availability, policy, and web search.

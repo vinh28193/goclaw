@@ -64,6 +64,8 @@
     },
     "requireUserCredentials": "Require User Credentials",
     "requireUserCredentialsHint": "Each user must configure their own credentials. Server is disabled for users without personal credentials.",
+    "injectIdentity": "Inject sender identity",
+    "injectIdentityHint": "Pass chat sender identity (sender_id, sender_name, chat_id, chat_type, channel) into every tool call. Enable for backends that need to identify the end-user.",
     "toolHints": "AI Agent Hints (Optional)",
     "toolHintsHint": "Admin-authored notes appended to each tool's description so the LLM knows server-specific quirks.",
     "toolHintsGlobal": "Global hint",

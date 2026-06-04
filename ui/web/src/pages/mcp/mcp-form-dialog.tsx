@@ -95,6 +95,7 @@ export function MCPFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
         timeout: server?.timeout_sec ?? 60,
         enabled: server?.enabled ?? true,
         requireUserCreds: server?.settings?.require_user_credentials ?? false,
+        injectIdentity: server?.settings?.inject_identity ?? false,
         toolHintsGlobal: server?.settings?.tool_hints?.global ?? "",
         toolHintsTools: server?.settings?.tool_hints?.tools ?? {},
       });
@@ -165,6 +166,7 @@ export function MCPFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
       const hasHints = trimmedGlobal !== "" || Object.keys(trimmedTools).length > 0;
       const settings: NonNullable<MCPServerInput["settings"]> = {
         require_user_credentials: data.requireUserCreds,
+        inject_identity: (data as any).injectIdentity ?? false,
       };
       if (hasHints) {
         settings.tool_hints = {
@@ -200,6 +202,7 @@ export function MCPFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
         <div className="grid gap-4 py-2 -mx-4 px-4 sm:-mx-6 sm:px-6 overflow-y-auto min-h-0">
           <McpConnectionFields form={form} />
           <McpSettingsFields form={form} />
+
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
 

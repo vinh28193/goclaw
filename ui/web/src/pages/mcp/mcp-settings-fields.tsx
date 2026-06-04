@@ -25,6 +25,7 @@ export function McpSettingsFields({ form }: McpSettingsFieldsProps) {
   const name = watch("name");
   const enabled = watch("enabled");
   const requireUserCreds = watch("requireUserCreds");
+  const injectIdentity = watch("injectIdentity") ?? false;
   const toolHintsGlobal = watch("toolHintsGlobal");
   const toolHintsTools = watch("toolHintsTools") as Record<string, string>;
 
@@ -129,6 +130,18 @@ export function McpSettingsFields({ form }: McpSettingsFieldsProps) {
           <Label htmlFor="mcp-require-creds">{t("form.requireUserCredentials")}</Label>
         </div>
         <p className="text-xs text-muted-foreground pl-9">{t("form.requireUserCredentialsHint")}</p>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Switch
+            id="mcp-inject-identity"
+            checked={injectIdentity}
+            onCheckedChange={(v) => setValue("injectIdentity" as any, v)}
+          />
+          <Label htmlFor="mcp-inject-identity">{t("form.injectIdentity")}</Label>
+        </div>
+        <p className="text-xs text-muted-foreground pl-9">{t("form.injectIdentityHint")}</p>
       </div>
     </>
   );

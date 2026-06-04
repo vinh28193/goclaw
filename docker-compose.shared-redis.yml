@@ -1,0 +1,32 @@
+# docker-compose.shared-redis.yml — Redis overlay that points goclaw at the
+# shared `cache` (Redis) container owned by affiliate-backend, instead of
+# spinning up goclaw's own Redis (as docker-compose.redis.yml would).
+#
+# Network model: goclaw joins the external `platform-cache` network where
+# affiliate-backend's `cache` service is also attached. Inside that network the
+# service name `cache` resolves to the Redis container.
+#
+# Keyspace isolation: Redis DB 0 belongs to affiliate-backend; goclaw uses DB 1.
+#
+# Pre-req:  docker network create platform-cache   (handled by setup-goclaw-mcp.sh)
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml \
+#                  -f docker-compose.selfservice.yml -f docker-compose.shared-redis.yml up -d
+
+services:
+  goclaw:
+    build:
+      args:
+        ENABLE_REDIS: "true"
+    environment:
+      - GOCLAW_REDIS_DSN=redis://cache:6379/1
+    networks:
+      - default
+      - goclaw-net
+      - platform-cache
+
+networks:
+  platform-cache:
+    name: platform-cache
+    external: true

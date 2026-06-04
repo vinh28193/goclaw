@@ -122,7 +122,7 @@ func (l *InstanceLoader) Reload(ctx context.Context) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// Stop and unregister old channels
+	// Stop and unregister old channels (and clear cached filter configs).
 	for name := range l.loaded {
 		if ch, ok := l.manager.GetChannel(name); ok {
 			if err := ch.Stop(ctx); err != nil {
@@ -130,10 +130,14 @@ func (l *InstanceLoader) Reload(ctx context.Context) {
 			}
 		}
 		l.manager.UnregisterChannel(name)
+		l.manager.SetRespondFilter(name, nil)
 	}
 	l.loaded = make(map[string]struct{})
 
 	// Brief pause to let external APIs (e.g., Telegram getUpdates) release polling locks.
+	// During this Stop→re-register window, in-flight inbound goroutines may bypass the filter
+	// (RespondFilter returns nil → fail-open Wake). Acceptable per YAGNI; if stricter behavior
+	// is needed later, queue inbound messages during reload.
 	time.Sleep(500 * time.Millisecond)
 
 	// Reload from DB (all tenants — server-internal)
@@ -169,6 +173,7 @@ func (l *InstanceLoader) Stop(ctx context.Context) {
 			}
 		}
 		l.manager.UnregisterChannel(name)
+		l.manager.SetRespondFilter(name, nil) // symmetry with Reload
 	}
 	l.loaded = make(map[string]struct{})
 }
@@ -337,6 +342,10 @@ func (l *InstanceLoader) loadInstance(ctx context.Context, inst store.ChannelIns
 		}
 	}
 	l.manager.RegisterChannel(inst.Name, ch)
+
+	// Cache the respond filter (may be nil if mode=off or absent).
+	// ParseRespondFilter reads from the already-coerced cfg, so we pass the raw instance config.
+	l.manager.SetRespondFilter(inst.Name, ParseRespondFilter(cfg))
 
 	// Start the channel if requested (Reload path). LoadAll defers to StartAll.
 	// Bound the wait so one hung Start() can't block Reload()'s mutex and wedge

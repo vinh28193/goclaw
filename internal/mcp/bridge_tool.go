@@ -50,6 +50,7 @@ type BridgeTool struct {
 	timeoutSec        int
 	connected         *atomic.Bool
 	grantChecker      GrantChecker // for runtime grant recheck (nil = skip check)
+	injectIdentity    bool         // when true, inject sender identity fields into every tool call
 	// forceReconnect triggers an out-of-band Initialize when Execute detects
 	// the server reset its session lifecycle. Optional — nil falls back to
 	// "connected=false + wait for health loop". Wired via WithForceReconnect.
@@ -62,6 +63,7 @@ type BridgeTool struct {
 // clientPtr is a shared atomic pointer from serverState — reconnection swaps it
 // atomically, and all BridgeTools see the new client without explicit notification.
 // serverID and grantChecker are optional — pass uuid.Nil and nil for config-path mode.
+// injectIdentity controls whether sender identity fields are injected into every call.
 func NewBridgeTool(serverName string, mcpTool mcpgo.Tool, clientPtr *atomic.Pointer[mcpclient.Client], prefix string, timeoutSec int, connected *atomic.Bool, serverID uuid.UUID, grantChecker GrantChecker) *BridgeTool {
 	name := mcpTool.Name
 	effectivePrefix := ensureMCPPrefix(prefix, serverName)
@@ -225,6 +227,12 @@ func (t *BridgeTool) Execute(ctx context.Context, args map[string]any) *tools.Re
 	// (e.g. empty string for UUID fields).
 	cleanedArgs := t.stripEmptyOptionalArgs(args)
 
+	// Inject sender identity fields when the server has inject_identity=true.
+	// Fields are only set when absent and non-empty (collision guard in injectSenderIdentity).
+	if t.injectIdentity {
+		injectSenderIdentity(ctx, cleanedArgs)
+	}
+
 	req := mcpgo.CallToolRequest{}
 	req.Params.Name = t.toolName
 	req.Params.Arguments = cleanedArgs
@@ -340,7 +348,8 @@ func inputSchemaToMap(schema mcpgo.ToolInputSchema) map[string]any {
 // of omitting them, causing MCP servers to reject invalid values.
 func (t *BridgeTool) stripEmptyOptionalArgs(args map[string]any) map[string]any {
 	if len(args) == 0 {
-		return args
+		// Always return a fresh map so injectSenderIdentity mutations don't affect the caller's map.
+		return make(map[string]any)
 	}
 	cleaned := make(map[string]any, len(args))
 	for k, v := range args {

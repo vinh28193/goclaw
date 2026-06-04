@@ -63,7 +63,7 @@ func (l *Loop) injectContext(ctx context.Context, req *RunRequest) (contextSetup
 	if req.SenderID != "" {
 		ctx = store.WithSenderID(ctx, req.SenderID)
 	}
-	// Inject sender display name for bootstrap auto-contact
+	// Inject sender display name for bootstrap auto-contact and MCP identity injection
 	if req.SenderName != "" {
 		ctx = store.WithSenderName(ctx, req.SenderName)
 	}
@@ -381,6 +381,7 @@ func (l *Loop) injectContext(ctx context.Context, req *RunRequest) (contextSetup
 		CredentialUserID:    credUserID,
 		AgentType:           l.agentType,
 		SenderID:            req.SenderID,
+		SenderName:          req.SenderName,
 		SelfEvolve:          l.selfEvolve,
 		SharedMemory:        store.IsSharedMemory(ctx),
 		SharedKG:            store.IsSharedKG(ctx),

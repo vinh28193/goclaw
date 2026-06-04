@@ -64,6 +64,8 @@
     },
     "requireUserCredentials": "要求用户凭据",
     "requireUserCredentialsHint": "每个用户必须配置自己的凭据。未设置凭据的用户将无法使用此服务器。",
+    "injectIdentity": "注入发送者身份",
+    "injectIdentityHint": "将聊天发送者身份（sender_id、sender_name、chat_id、chat_type、channel）注入每次工具调用。适用于需要识别最终用户的后端。",
     "toolHints": "AI 智能体提示（可选）",
     "toolHintsHint": "管理员手写的说明，会附加到每个工具的描述中，让 LLM 了解此服务器的特殊用法。",
     "toolHintsGlobal": "通用提示",

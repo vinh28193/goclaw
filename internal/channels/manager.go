@@ -56,6 +56,9 @@ type Manager struct {
 	dispatchTask     *asyncTask
 	mu               sync.RWMutex
 	contactCollector *store.ContactCollector
+	// respondFilters caches parsed RespondFilter per channel instance name.
+	// Populated at instance load/reload; nil entry = no filter (mode off or absent).
+	respondFilters map[string]*RespondFilter
 }
 
 type asyncTask struct {
@@ -66,10 +69,28 @@ type asyncTask struct {
 // Channels are registered externally via RegisterChannel.
 func NewManager(msgBus *bus.MessageBus) *Manager {
 	return &Manager{
-		channels: make(map[string]Channel),
-		health:   make(map[string]ChannelHealth),
-		bus:      msgBus,
+		channels:       make(map[string]Channel),
+		health:         make(map[string]ChannelHealth),
+		bus:            msgBus,
+		respondFilters: make(map[string]*RespondFilter),
 	}
+}
+
+// SetRespondFilter caches the parsed RespondFilter for a named channel instance.
+// Called by InstanceLoader after parsing the instance Config JSONB.
+// A nil filter means no filtering (mode off or absent config).
+func (m *Manager) SetRespondFilter(channelName string, f *RespondFilter) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.respondFilters[channelName] = f
+}
+
+// RespondFilter returns the cached RespondFilter for a named channel instance.
+// Returns nil when the instance has no filter or mode is off — callers must nil-check.
+func (m *Manager) RespondFilter(channelName string) *RespondFilter {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.respondFilters[channelName]
 }
 
 // StartAll starts all registered channels and the outbound dispatch loop.

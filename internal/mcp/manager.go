@@ -195,7 +195,8 @@ func (m *Manager) Start(ctx context.Context) error {
 		// Config-path servers have no DB-backed Settings, so no tool hints.
 		// Also no grant-based tool filtering (allow/deny are nil) — config
 		// trust model is that the operator gates which servers are enabled.
-		if err := m.connectServer(ctx, name, cfg.Transport, cfg.Command, cfg.Args, cfg.Env, cfg.URL, headers, cfg.ToolPrefix, cfg.TimeoutSec, uuid.Nil, ToolHints{}, nil, nil); err != nil {
+		// Config-path servers never inject identity (no inject_identity in static config).
+		if err := m.connectServer(ctx, name, cfg.Transport, cfg.Command, cfg.Args, cfg.Env, cfg.URL, headers, cfg.ToolPrefix, cfg.TimeoutSec, uuid.Nil, ToolHints{}, nil, nil, false); err != nil {
 			slog.Warn("mcp.server.connect_failed", "server", name, "error", err)
 			errs = append(errs, fmt.Sprintf("%s: %v", name, err))
 		}
@@ -303,19 +304,20 @@ func (m *Manager) resolveServerCredentials(ctx context.Context, info store.MCPAc
 func (m *Manager) connectAndFilter(ctx context.Context, rs *resolvedServer) error {
 	srv := rs.info.Server
 	hints := ParseToolHints(srv.Settings)
+	injectIdentity := InjectIdentityEnabled(srv.Settings)
 
 	if m.pool != nil && !rs.hasUserCreds {
 		// Pool mode: acquire shared connection, create per-agent BridgeTools
 		tid := store.TenantIDFromContext(ctx)
 		return m.connectViaPool(ctx, tid, srv.Name, srv.Transport, srv.Command,
 			rs.args, rs.env, srv.URL, rs.headers, srv.ToolPrefix, srv.TimeoutSec, srv.ID, hints,
-			rs.info.ToolAllow, rs.info.ToolDeny)
+			rs.info.ToolAllow, rs.info.ToolDeny, injectIdentity)
 	}
 	// Per-agent mode: create per-agent connection
 	return m.connectServer(ctx, srv.Name, srv.Transport, srv.Command,
 		rs.args, rs.env, srv.URL, rs.headers,
-		srv.ToolPrefix, srv.TimeoutSec, srv.ID, hints,
-		rs.info.ToolAllow, rs.info.ToolDeny)
+		srv.ToolPrefix, srv.TimeoutSec, uuid.Nil, hints,
+		rs.info.ToolAllow, rs.info.ToolDeny, injectIdentity)
 }
 
 // LoadForAgent connects MCP servers accessible by a specific agent+user.
@@ -639,4 +641,19 @@ func (h ToolHints) HintFor(toolName string) string {
 		return ""
 	}
 	return h.Tools[toolName]
+}
+
+// InjectIdentityEnabled reports whether an MCP server's settings enable sender identity injection.
+// When true, the 5 identity fields (sender_id, sender_name, chat_id, chat_type, channel)
+// are injected into every tool-call arguments map before dispatch.
+// Used internally (connectAndFilter) and by external callers (e.g. agent/loop_mcp_user.go).
+func InjectIdentityEnabled(settings json.RawMessage) bool {
+	if len(settings) == 0 {
+		return false
+	}
+	var s struct {
+		InjectIdentity bool `json:"inject_identity"`
+	}
+	_ = json.Unmarshal(settings, &s)
+	return s.InjectIdentity
 }

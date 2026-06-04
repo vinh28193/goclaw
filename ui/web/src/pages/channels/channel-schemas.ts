@@ -1,6 +1,22 @@
 // Per-channel-type field definitions for credentials and config.
 // Used by the form dialog to render proper UI fields instead of raw JSON.
 
+// --- respond_filter types (must match Go JSON tags exactly) ---
+
+export type RespondFilterMode = "off" | "regex" | "classifier" | "hybrid";
+export type ApplyScope = "both" | "direct" | "group";
+export type OnNoMatch = "ignore" | "wake";
+
+export interface RespondFilter {
+  mode: RespondFilterMode;
+  url_domains?: string[];
+  keywords?: string[];
+  classifier_model?: string;
+  classifier_prompt?: string;
+  on_no_match?: OnNoMatch;
+  apply_scope?: ApplyScope;
+}
+
 export interface FieldDef {
   key: string;
   label: string;

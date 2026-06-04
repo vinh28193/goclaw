@@ -109,3 +109,6 @@ ui/web/nginx.staging.conf
 **/debug-*.log
 /*.sql
 scripts/docker-patch-*.sql
+
+# pnpm content-addressable store (local cache)
+.pnpm-store/

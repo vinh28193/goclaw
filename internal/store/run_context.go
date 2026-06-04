@@ -28,6 +28,7 @@ type RunContext struct {
 	CredentialUserID string // resolved tenant user for credential lookups (empty = use UserID)
 	AgentType        string
 	SenderID         string
+	SenderName       string // display name of the original individual sender (for MCP identity injection)
 
 	// Flags
 	SelfEvolve          bool

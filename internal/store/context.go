@@ -21,6 +21,9 @@ const (
 	// In group chats, UserIDKey is group-scoped but SenderIDKey preserves
 	// the actual person who sent the message.
 	SenderIDKey contextKey = "goclaw_sender_id"
+	// SenderNameKey is the display name of the original individual sender.
+	// Populated by Phase 2 channel wiring; returns "" until then.
+	SenderNameKey contextKey = "goclaw_sender_name"
 	// SelfEvolveKey indicates whether a predefined agent can update its SOUL.md.
 	SelfEvolveKey contextKey = "goclaw_self_evolve"
 	// LocaleKey is the context key for the user's preferred locale (e.g. "en", "vi", "zh").
@@ -48,8 +51,6 @@ const (
 	// CredentialUserIDKey holds the resolved tenant user identity for credential lookups.
 	// Falls back to UserIDFromContext if not set.
 	CredentialUserIDKey contextKey = "goclaw_credential_user_id"
-	// SenderNameKey is the display name from channel metadata (for bootstrap auto-contact).
-	SenderNameKey contextKey = "goclaw_sender_name"
 	// AgentAudioKey carries the immutable agent audio snapshot for TTS tool dispatch.
 	AgentAudioKey contextKey = "goclaw_agent_audio"
 )
@@ -197,8 +198,13 @@ func WithSenderName(ctx context.Context, name string) context.Context {
 
 // SenderNameFromContext extracts the sender display name. Returns "" if not set.
 func SenderNameFromContext(ctx context.Context) string {
-	v, _ := ctx.Value(SenderNameKey).(string)
-	return v
+	if v, ok := ctx.Value(SenderNameKey).(string); ok && v != "" {
+		return v
+	}
+	if rc := RunContextFromCtx(ctx); rc != nil {
+		return rc.SenderName
+	}
+	return ""
 }
 
 // SenderIDFromContext extracts the sender ID from context. Returns "" if not set.

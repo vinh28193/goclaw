@@ -13,6 +13,8 @@ import {
 import { StickySaveBar } from "@/components/shared/sticky-save-bar";
 import { ChannelFields } from "../channel-fields";
 import { configSchema } from "../channel-schemas";
+import { RespondFilterFields } from "../respond-filter-fields";
+import type { RespondFilter } from "../channel-schemas";
 import type { ChannelInstanceData } from "@/types/channel";
 import type { AgentData } from "@/types/agent";
 import { channelTypeLabels } from "../channels-status-view";
@@ -46,6 +48,9 @@ export function ChannelGeneralTab({ instance, agents, onUpdate }: ChannelGeneral
       .map((k) => [k, existingConfig[k]]),
   );
   const [policyValues, setPolicyValues] = useState<Record<string, unknown>>(initialPolicyValues);
+  const [respondFilter, setRespondFilter] = useState<RespondFilter | undefined>(
+    (existingConfig.respond_filter as RespondFilter | undefined) ?? undefined,
+  );
 
   const [saving, setSaving] = useState(false);
 
@@ -60,7 +65,12 @@ export function ChannelGeneralTab({ instance, agents, onUpdate }: ChannelGeneral
       const cleanPolicies = Object.fromEntries(
         Object.entries(policyValues).filter(([, v]) => v !== undefined && v !== "" && v !== null),
       );
-      const mergedConfig = { ...existingConfig, ...cleanPolicies };
+      const mergedConfig: Record<string, unknown> = { ...existingConfig, ...cleanPolicies };
+      if (respondFilter !== undefined) {
+        mergedConfig.respond_filter = respondFilter;
+      } else {
+        delete mergedConfig.respond_filter;
+      }
       await onUpdate({
         display_name: displayName || null,
         agent_id: agentId,
@@ -141,6 +151,9 @@ export function ChannelGeneralTab({ instance, agents, onUpdate }: ChannelGeneral
           />
         </section>
       )}
+
+      {/* Message Filter section */}
+      <RespondFilterFields value={respondFilter} onChange={setRespondFilter} />
 
       <StickySaveBar
         onSave={handleSave}

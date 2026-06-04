@@ -313,6 +313,37 @@
       "tokopedia":   "Tokopedia"
     }
   },
+  "respondFilter": {
+    "title": "Bộ lọc tin nhắn",
+    "help": "Lọc tin nhắn đến trước khi chuyển cho agent. Tắt = cho qua tất cả tin nhắn.",
+    "mode": "Chế độ",
+    "modes": {
+      "off": "Tắt (cho qua tất cả)",
+      "regex": "Regex / Từ khóa",
+      "classifier": "AI phân loại",
+      "hybrid": "Kết hợp (regex + AI)"
+    },
+    "applyScope": "Áp dụng cho",
+    "applyScopes": {
+      "both": "Cả DM và nhóm",
+      "direct": "Chỉ DM",
+      "group": "Chỉ nhóm"
+    },
+    "onNoMatch": "Khi không khớp",
+    "onNoMatchValues": {
+      "ignore": "Im lặng (bỏ qua)",
+      "wake": "Vẫn gọi agent"
+    },
+    "onNoMatchHint": "ignore = im lặng, bỏ qua tin nhắn (mặc định); wake = vẫn gọi agent dù không khớp",
+    "urlDomains": "Tên miền URL",
+    "urlDomainsHint": "Mỗi tên miền một dòng (vd: shopee.vn). Tin nhắn được chuyển nếu chứa link từ các tên miền này.",
+    "keywords": "Từ khóa",
+    "keywordsHint": "Mỗi từ khóa một dòng. Tin nhắn được chuyển nếu chứa bất kỳ từ khóa nào (không phân biệt hoa thường).",
+    "classifierModel": "Model phân loại",
+    "classifierModelHint": "ID model (vd: claude-haiku-4-5-20251001). Để trống = dùng model của agent.",
+    "classifierPrompt": "Prompt phân loại",
+    "classifierPromptHint": "Prompt tùy chỉnh cho bộ phân loại. Để trống = dùng prompt mặc định tích hợp."
+  },
   "groupOverrides": {
     "title": "Ghi đè nhóm & chủ đề",
     "hint": "Ghi đè mặc định channel theo cuộc trò chuyện nhóm hoặc chủ đề diễn đàn. Dùng \"*\" làm ID nhóm cho mặc định ký tự đại diện.",

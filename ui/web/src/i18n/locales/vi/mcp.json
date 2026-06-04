@@ -64,6 +64,8 @@
     },
     "requireUserCredentials": "Yêu cầu Credentials riêng",
     "requireUserCredentialsHint": "Mỗi user phải cấu hình credentials riêng. Server bị vô hiệu cho user chưa có credentials.",
+    "injectIdentity": "Truyền danh tính người gửi",
+    "injectIdentityHint": "Truyền danh tính người gửi (sender_id, sender_name, chat_id, chat_type, channel) vào mỗi lời gọi công cụ. Bật khi backend cần nhận dạng người dùng cuối.",
     "toolHints": "Gợi ý cho AI Agent (Tùy chọn)",
     "toolHintsHint": "Ghi chú do admin viết, gắn vào description của từng tool để LLM biết đặc thù của server này.",
     "toolHintsGlobal": "Gợi ý chung",
