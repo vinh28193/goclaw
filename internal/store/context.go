@@ -51,6 +51,8 @@ const (
 	// CredentialUserIDKey holds the resolved tenant user identity for credential lookups.
 	// Falls back to UserIDFromContext if not set.
 	CredentialUserIDKey contextKey = "goclaw_credential_user_id"
+	// ChannelContextScopeKey carries the channel/group/user scope for runtime grants and credentials.
+	ChannelContextScopeKey contextKey = "goclaw_channel_context_scope"
 	// AgentAudioKey carries the immutable agent audio snapshot for TTS tool dispatch.
 	AgentAudioKey contextKey = "goclaw_agent_audio"
 )

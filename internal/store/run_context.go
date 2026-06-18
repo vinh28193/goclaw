@@ -25,6 +25,8 @@ type RunContext struct {
 	AgentKey         string
 	TenantID         uuid.UUID
 	UserID           string
+	RunID            string
+	SessionKey       string
 	CredentialUserID string // resolved tenant user for credential lookups (empty = use UserID)
 	AgentType        string
 	SenderID         string
@@ -40,7 +42,9 @@ type RunContext struct {
 
 	// Tool configuration
 	BuiltinToolSettings map[string][]byte
+	Channel             string
 	ChannelType         string
+	ChannelContextScope ChannelContextScope
 	SubagentsCfg        *config.SubagentsConfig
 	ParentModel         string
 	ParentProvider      string

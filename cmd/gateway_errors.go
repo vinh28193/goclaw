@@ -10,7 +10,13 @@ import (
 
 // Matching TS pi-embedded-helpers/errors.ts error classification.
 // Never expose raw JSON/API payloads to the user.
-func formatAgentError(err error) string {
+//
+// Returns (userMessage, classified). When classified=true the message has been
+// matched to a known failure class and is safe to forward to public-facing
+// channels (Telegram, Facebook, ...). When classified=false the message is a
+// generic fallback and may correlate with raw error text in logs only —
+// callers should suppress it on external channels to avoid leaking internals.
+func formatAgentError(err error) (string, bool) {
 	raw := err.Error()
 	lower := strings.ToLower(raw)
 
@@ -18,47 +24,48 @@ func formatAgentError(err error) string {
 	// "context deadline exceeded" contains both "context" and "exceeded",
 	// which would false-positive match the context overflow heuristic.
 	if containsAny(lower, "timeout", "timed out", "deadline exceeded") {
-		return "⚠️ Request timed out. Please try again."
+		return "⚠️ Request timed out. Please try again.", true
 	}
 
 	// 2. Context overflow
 	if isContextOverflowError(lower) {
-		return "⚠️ Context overflow — message too large for this model. Try /new to start a fresh session."
+		return "⚠️ Context overflow — message too large for this model. Try /new to start a fresh session.", true
 	}
 
 	// 3. Role ordering / message format errors (tool_use_id mismatch, roles must alternate, etc.)
 	if isMessageFormatError(lower) {
-		return "⚠️ Session history conflict — please try again. If this persists, use /new to start a fresh session."
+		return "⚠️ Session history conflict — please try again. If this persists, use /new to start a fresh session.", true
 	}
 
 	// 4. Rate limit
 	if containsAny(lower, "rate limit", "rate_limit", "too many requests", "429", "quota exceeded", "resource_exhausted", "usage limit") {
-		return "⚠️ API rate limit reached. Please try again later."
+		return "⚠️ API rate limit reached. Please try again later.", true
 	}
 
 	// 5. Overloaded
 	if strings.Contains(lower, "overloaded") {
-		return "⚠️ The AI service is temporarily overloaded. Please try again in a moment."
+		return "⚠️ The AI service is temporarily overloaded. Please try again in a moment.", true
 	}
 
 	// 6. Billing
 	if containsAny(lower, "billing", "insufficient credits", "credit balance", "payment required", "402") {
-		return "⚠️ API billing error — your API key may have run out of credits. Check your provider's billing dashboard."
+		return "⚠️ API billing error — your API key may have run out of credits. Check your provider's billing dashboard.", true
 	}
 
 	// 7. Auth errors
 	if containsAny(lower, "invalid api key", "invalid_api_key", "unauthorized", "forbidden", "authentication", "401", "403", "access denied") {
-		return "⚠️ Authentication error. Please check your API key configuration."
+		return "⚠️ Authentication error. Please check your API key configuration.", true
 	}
 
 	// 8. Model config
 	if strings.Contains(lower, "not a valid model") {
-		return "⚠️ Model configuration error. Please check your config and restart."
+		return "⚠️ Model configuration error. Please check your config and restart.", true
 	}
 
-	// 9. Generic — log the full error but show only a safe message to user
+	// 9. Generic — log the full error but show only a safe message to user.
+	// Returned classified=false so external channels suppress to avoid leaking raw error context.
 	slog.Warn("unclassified agent error", "error", raw)
-	return "⚠️ Sorry, something went wrong processing your message. Please try again."
+	return "⚠️ Sorry, something went wrong processing your message. Please try again.", false
 }
 
 // isContextOverflowError checks for context window/size overflow patterns.
