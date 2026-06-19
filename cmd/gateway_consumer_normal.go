@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -19,6 +20,37 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
+
+// slowRunAckDelay is how long an agent run may go without a final reply before
+// the gateway sends an interim apology to public-facing channels. Tuned around
+// human-perceived "this is taking a while" threshold for chat.
+const slowRunAckDelay = 15 * time.Second
+
+// slowRunAckMessages are the rotating interim phrasings shown when an agent
+// run exceeds slowRunAckDelay. Variation matters: a fixed string repeated
+// across turns reads as robotic. Selected by run-id hash so a single run
+// stays consistent and pool entries spread across runs.
+var slowRunAckMessages = []string{
+	"⏳ Đợi em xíu nha, em đang tra cứu giúp mình...",
+	"🙏 Em xin lỗi đợi hơi lâu, em xử lý nốt đây nha...",
+	"👀 Cho em thêm xíu nữa nhé, sắp xong rồi...",
+	"✨ Anh/chị đợi em chút nha, mạng đang chậm xíu...",
+	"🔎 Em check kỹ tí xíu nữa nha, gần xong rồi đây...",
+}
+
+// pickSlowRunAck deterministically chooses an interim phrasing for a run.
+// runID is hashed (FNV-like fold) modulo the pool size — cheap, no allocation,
+// no math/rand seeding, stable per run for future replays.
+func pickSlowRunAck(runID string) string {
+	if len(slowRunAckMessages) == 0 {
+		return ""
+	}
+	var sum uint32
+	for i := 0; i < len(runID); i++ {
+		sum = sum*31 + uint32(runID[i])
+	}
+	return slowRunAckMessages[int(sum)%len(slowRunAckMessages)]
+}
 
 // processNormalMessage handles routing, scheduling, and response delivery for a single
 // (possibly merged) inbound message. Called directly by the debouncer's flush callback.
@@ -474,7 +506,38 @@ func processNormalMessage(
 
 	// Handle result asynchronously to not block the flush callback.
 	go func(agentKey, channel, chatID, session, rID, peerKind, inboundContent string, meta map[string]string, blockReplyEnabled bool, ptd *tools.PendingTeamDispatch, tenantID, agentUUID uuid.UUID, agentOtherConfig []byte) {
-		outcome := <-outCh
+		// Reactive slow-run ack: if the agent run hasn't produced an outcome
+		// within slowRunAckDelay, surface an interim apology to public-facing
+		// channels so the user isn't staring at silence. Internal channels (ws)
+		// already render thinking indicators, so they skip the interim text.
+		var outcome scheduler.RunOutcome
+		isExternal := false
+		if deps.ChannelMgr != nil {
+			isExternal = isExternalChannel(deps.ChannelMgr.ChannelTypeForName(channel))
+		}
+		if isExternal {
+			ackTimer := time.NewTimer(slowRunAckDelay)
+			select {
+			case outcome = <-outCh:
+				ackTimer.Stop()
+			case <-ackTimer.C:
+				ackText := pickSlowRunAck(rID)
+				slog.Info("inbound: slow_run_ack emitted",
+					"channel", channel, "session", session,
+					"after", slowRunAckDelay, "text", ackText)
+				deps.MsgBus.PublishOutbound(bus.OutboundMessage{
+					Channel:  channel,
+					ChatID:   chatID,
+					Content:  ackText,
+					Metadata: meta,
+					TenantID: tenantID,
+					AgentID:  agentUUID,
+				})
+				outcome = <-outCh
+			}
+		} else {
+			outcome = <-outCh
+		}
 
 		// Release team create lock — tasks already visible in DB, other goroutines can list.
 		ptd.ReleaseTeamLock()
@@ -509,12 +572,13 @@ func processNormalMessage(
 				return
 			}
 			slog.Error("inbound: agent run failed", "error", outcome.Err, "channel", channel)
-			// Suppress technical error text on public-facing channels (FB, Telegram, etc.)
-			// Empty Content still triggers placeholder/typing cleanup downstream.
-			errContent := formatAgentError(outcome.Err)
-			if deps.ChannelMgr != nil {
+			// Forward classified (safe, sanitized) error messages to all channels so
+			// end users see something instead of silent failure. Only suppress
+			// unclassified fallbacks on public-facing channels to avoid leaking internals.
+			errContent, classified := formatAgentError(outcome.Err)
+			if !classified && deps.ChannelMgr != nil {
 				if ct := deps.ChannelMgr.ChannelTypeForName(channel); isExternalChannel(ct) {
-					slog.Info("inbound: suppressed error for external channel", "channel", channel, "type", ct)
+					slog.Info("inbound: suppressed unclassified error for external channel", "channel", channel, "type", ct)
 					errContent = ""
 				}
 			}
