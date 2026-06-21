@@ -1,0 +1,6 @@
+# Smoke overlay: share affiliate-backend's PDF storage so goclaw can read
+# `send_pdf_attachment.attachment_path` from the same mount path.
+services:
+  goclaw:
+    volumes:
+      - /Users/vinh/Workpaces/python-basic/affiliate-backend/storage:/app/storage:ro
