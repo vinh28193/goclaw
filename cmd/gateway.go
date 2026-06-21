@@ -407,6 +407,9 @@ func runGateway() {
 	if postTurn != nil {
 		wakeH.SetPostTurnProcessor(postTurn)
 	}
+	// channelMgr binding deferred — it's constructed below; we set it as soon
+	// as it exists so `is_system_command` wake requests can bypass the LLM
+	// and dispatch straight to channels.
 
 	// Wire all server.Set*Handler() calls via extracted helper.
 	deps.wireHTTPHandlersOnServer(
@@ -499,6 +502,11 @@ func runGateway() {
 	// Channel manager
 	channelMgr := channels.NewManager(msgBus)
 	deps.channelMgr = channelMgr
+
+	// Bind the channel manager to the wake handler so backend-initiated
+	// `is_system_command` wake requests (send_chat_message /
+	// send_pdf_attachment) dispatch straight to channels without the LLM loop.
+	wakeH.SetChannelManager(channelMgr)
 
 	// Wire channel member resolver into permission grant paths (WS + HTTP) so
 	// file_writer grants coming from the Web UI auto-enrich their metadata.
