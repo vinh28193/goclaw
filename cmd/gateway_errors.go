@@ -24,48 +24,57 @@ func formatAgentError(err error) (string, bool) {
 	// "context deadline exceeded" contains both "context" and "exceeded",
 	// which would false-positive match the context overflow heuristic.
 	if containsAny(lower, "timeout", "timed out", "deadline exceeded") {
-		return "⚠️ Request timed out. Please try again.", true
+		return "⏱️ Em hơi chậm xíu nha, anh thử lại sau ít giây giúp em 🙏", true
 	}
 
 	// 2. Context overflow
 	if isContextOverflowError(lower) {
-		return "⚠️ Context overflow — message too large for this model. Try /new to start a fresh session.", true
+		return "📚 Hội thoại dài quá rồi, anh dùng /new để bắt đầu lại nha", true
 	}
 
 	// 3. Role ordering / message format errors (tool_use_id mismatch, roles must alternate, etc.)
 	if isMessageFormatError(lower) {
-		return "⚠️ Session history conflict — please try again. If this persists, use /new to start a fresh session.", true
+		return "🔄 Lịch sử hội thoại bị lẫn — anh thử lại 1 lần nữa nhé. Nếu vẫn vậy dùng /new để reset", true
 	}
 
 	// 4. Rate limit
 	if containsAny(lower, "rate limit", "rate_limit", "too many requests", "429", "quota exceeded", "resource_exhausted", "usage limit") {
-		return "⚠️ API rate limit reached. Please try again later.", true
+		return "⏳ Em đang xử lý nhiều quá anh ơi, đợi 1 phút rồi gửi lại giúp em 🙏", true
 	}
 
-	// 5. Overloaded
-	if strings.Contains(lower, "overloaded") {
-		return "⚠️ The AI service is temporarily overloaded. Please try again in a moment.", true
+	// 5. Overloaded / Unavailable (HTTP 503, Gemini "high demand", Anthropic overloaded, etc.)
+	if containsAny(lower,
+		"overloaded",
+		"high demand",
+		"service unavailable",
+		"temporarily unavailable",
+		"unavailable",
+		" 503",
+		"http 503",
+		"resource_unavailable",
+	) {
+		return "🛠️ Hệ thống AI đang quá tải, anh thử lại sau ít giây nha 🙏", true
 	}
 
 	// 6. Billing
 	if containsAny(lower, "billing", "insufficient credits", "credit balance", "payment required", "402") {
-		return "⚠️ API billing error — your API key may have run out of credits. Check your provider's billing dashboard.", true
+		return "💳 API billing có vấn đề — admin kiểm tra credit của API key giúp em nha", true
 	}
 
 	// 7. Auth errors
 	if containsAny(lower, "invalid api key", "invalid_api_key", "unauthorized", "forbidden", "authentication", "401", "403", "access denied") {
-		return "⚠️ Authentication error. Please check your API key configuration.", true
+		return "🔐 Lỗi xác thực API — admin kiểm tra cấu hình API key giúp em", true
 	}
 
 	// 8. Model config
 	if strings.Contains(lower, "not a valid model") {
-		return "⚠️ Model configuration error. Please check your config and restart.", true
+		return "⚙️ Lỗi cấu hình model — admin kiểm tra config rồi restart giúp em", true
 	}
 
 	// 9. Generic — log the full error but show only a safe message to user.
 	// Returned classified=false so external channels suppress to avoid leaking raw error context.
 	slog.Warn("unclassified agent error", "error", raw)
-	return "⚠️ Sorry, something went wrong processing your message. Please try again.", false
+	return "😅 Có chút trục trặc anh ơi, anh thử lại nha 🙏", false
 }
 
 // isContextOverflowError checks for context window/size overflow patterns.

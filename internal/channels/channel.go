@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/routing"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
@@ -208,9 +209,11 @@ type BaseChannel struct {
 	stateMu          sync.RWMutex
 	health           ChannelHealth
 	allowList        []string
-	agentID          string                  // for DB instances: routes to specific agent (empty = use resolveAgentRoute)
-	tenantID         uuid.UUID               // for DB instances: tenant scope (zero = master tenant fallback)
-	contactCollector *store.ContactCollector // optional: auto-collect contacts from channel messages
+	agentID          string                          // for DB instances: routes to specific agent (empty = use resolveAgentRoute)
+	tenantID         uuid.UUID                       // for DB instances: tenant scope (zero = master tenant fallback)
+	instanceID       uuid.UUID                       // DB channel_instances.id (zero for config-based channels); used as the route resolver key
+	routeResolver    *routing.AgentRouteResolver     // nil = no multi-agent routing (config-based channels keep legacy single-agent behavior)
+	contactCollector *store.ContactCollector         // optional: auto-collect contacts from channel messages
 
 	// Shared policy + pairing fields (set via setters after construction).
 	pairingService  store.PairingStore
@@ -259,6 +262,21 @@ func (c *BaseChannel) TenantID() uuid.UUID { return c.tenantID }
 
 // SetTenantID sets the tenant scope (used by InstanceLoader for DB instances).
 func (c *BaseChannel) SetTenantID(id uuid.UUID) { c.tenantID = id }
+
+// InstanceID returns the DB channel_instances.id (zero for config-based channels).
+// Used by channels to consult the agent route resolver before publishing inbound.
+func (c *BaseChannel) InstanceID() uuid.UUID { return c.instanceID }
+
+// SetInstanceID stores the DB channel_instances.id (used by InstanceLoader).
+func (c *BaseChannel) SetInstanceID(id uuid.UUID) { c.instanceID = id }
+
+// RouteResolver returns the agent route resolver (nil for config-based channels
+// or when channel_agent_routes infra is disabled).
+func (c *BaseChannel) RouteResolver() *routing.AgentRouteResolver { return c.routeResolver }
+
+// SetRouteResolver wires the agent route resolver. nil keeps legacy single-agent
+// behavior — channels MUST nil-check before calling Resolve.
+func (c *BaseChannel) SetRouteResolver(r *routing.AgentRouteResolver) { c.routeResolver = r }
 
 // SetContactCollector sets the contact collector for auto-collecting contacts from messages.
 func (c *BaseChannel) SetContactCollector(cc *store.ContactCollector) { c.contactCollector = cc }
@@ -643,17 +661,56 @@ func (c *BaseChannel) HandleMessage(senderID, chatID, content string, media []st
 		mediaFiles = append(mediaFiles, bus.MediaFile{Path: p, Filename: filepath.Base(p)})
 	}
 
+	targetAgentID := c.agentID
+	targetKind := store.RouteTargetAgent
+	var routeToolAllow []string
+	if c.routeResolver != nil && c.instanceID != uuid.Nil {
+		mediaKind := routing.DeriveMediaKindFromBusMedia(mediaFiles)
+		// BaseChannel callers (Zalo OA, Slack DM path, Pancake, Bitrix, Facebook) have
+		// no mention concept exposed here — pass false. Channels with mention gating
+		// (Telegram, Feishu) bypass BaseChannel.HandleMessage and call Resolve in
+		// their own handlers with wasMentioned correctly threaded.
+		// peerID = chat scope for DMs (chatID==senderID) OR group+sender composite
+		// for group messages so each user gets their own sticky binding.
+		peerID := chatID
+		if chatID != senderID {
+			peerID = chatID + ":" + senderID
+		}
+		decision, matched, err := c.routeResolver.ResolveDecision(context.Background(), c.instanceID, peerID, content, peerKind, mediaKind, false)
+		switch {
+		case err != nil:
+			slog.Warn("channel: route resolver error, falling back to default agent",
+				"channel", c.name, "instance_id", c.instanceID, "err", err)
+		case matched:
+			targetAgentID = decision.TargetID.String()
+			routeToolAllow = decision.ToolAllow
+			targetKind = decision.TargetKind
+			if decision.TargetKind == store.RouteTargetTeam {
+				slog.Info("channel: routed to team target",
+					"channel", c.name, "instance_id", c.instanceID, "team_id", targetAgentID,
+				)
+			} else {
+				slog.Debug("channel: routed via channel_agent_routes",
+					"channel", c.name, "instance_id", c.instanceID, "agent_id", targetAgentID,
+					"peer_kind", peerKind, "media_kind", mediaKind, "tool_allow_size", len(decision.ToolAllow),
+				)
+			}
+		}
+	}
+
 	msg := bus.InboundMessage{
-		Channel:  c.name,
-		SenderID: senderID,
-		ChatID:   chatID,
-		Content:  content,
-		Media:    mediaFiles,
-		PeerKind: peerKind,
-		UserID:   userID,
-		Metadata: metadata,
-		TenantID: c.tenantID,
-		AgentID:  c.agentID,
+		Channel:   c.name,
+		SenderID:  senderID,
+		ChatID:    chatID,
+		Content:   content,
+		Media:     mediaFiles,
+		PeerKind:  peerKind,
+		UserID:    userID,
+		Metadata:  metadata,
+		TenantID:  c.tenantID,
+		AgentID:    targetAgentID,
+		ToolAllow:  routeToolAllow,
+		TargetKind: targetKind,
 	}
 
 	c.bus.PublishInbound(msg)

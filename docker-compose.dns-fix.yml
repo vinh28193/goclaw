@@ -1,0 +1,9 @@
+# Workaround: Docker Desktop's internal DNS resolver (127.0.0.11) is failing
+# to forward external lookups. Pin explicit public DNS until the host issue
+# resolves. Delete this file once `docker exec <container> getent hosts api.telegram.org`
+# works again with the default resolver.
+services:
+  goclaw:
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8

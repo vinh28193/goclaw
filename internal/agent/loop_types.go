@@ -468,6 +468,24 @@ type LoopConfig struct {
 	UserResolver UserIdentityResolver
 }
 
+// CallTool invokes a registered tool by name directly (outside the LLM-driven
+// agent loop). Used by gateway-level fallback paths where the LLM is
+// transiently unavailable but we still want to dispatch deterministic tool
+// calls (e.g. URL handling). Returns (nil, false) if the tool isn't registered.
+//
+// Caller must set the appropriate context — tenant_id, agent_id, user_id,
+// channel — before calling, otherwise tools that require those will fail.
+func (l *Loop) CallTool(ctx context.Context, name string, args map[string]any) (*tools.Result, bool) {
+	if l.registry == nil {
+		return nil, false
+	}
+	tool, ok := l.registry.Get(name)
+	if !ok || tool == nil {
+		return nil, false
+	}
+	return tool.Execute(ctx, args), true
+}
+
 const defaultMaxTokens = config.DefaultMaxTokens
 
 // effectiveMaxTokens returns the configured max output tokens, defaulting to 8192.

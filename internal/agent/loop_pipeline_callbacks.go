@@ -12,6 +12,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/bootstrap"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/i18n"
+	mcpbridge "github.com/nextlevelbuilder/goclaw/internal/mcp"
 	"github.com/nextlevelbuilder/goclaw/internal/pipeline"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
@@ -262,6 +263,12 @@ func (l *Loop) makeAuthorizeToolCall() func(ctx context.Context, state *pipeline
 		allowed := state.Tool.AllowedTools
 		if allowed == nil {
 			// nil allowlist means no per-iteration restriction (e.g. BuildFilteredTools not wired).
+			// Per-route ToolAllow still narrows even in this branch — defense in depth
+			// against deferred MCP tools that bypass FilterTools.
+			name := l.resolveToolCallName(tc.Name)
+			if state.Input != nil && len(state.Input.ToolAllow) > 0 && !mcpbridge.IsToolAllowed(name, state.Input.ToolAllow, nil) {
+				return false, "tool not in per-route allow: " + name
+			}
 			return true, ""
 		}
 
@@ -269,6 +276,16 @@ func (l *Loop) makeAuthorizeToolCall() func(ctx context.Context, state *pipeline
 		// by canonical names; the model may emit prefixed names when toolCallPrefix
 		// is set (e.g. "proxy_exec" vs "exec"). Without this the lookup always misses.
 		name := l.resolveToolCallName(tc.Name)
+
+		// Per-route narrowing — applies on top of policy filtering. state.Input.ToolAllow
+		// comes from bus.InboundMessage.ToolAllow (set by channel handlers when a
+		// channel_agent_routes row matched). Built-in tools already pass through
+		// FilterTools(req.ToolAllow); this check is the gate for deferred MCP tools
+		// activated below via TryActivateDeferred — they would otherwise bypass the
+		// per-route allow list.
+		if state.Input != nil && len(state.Input.ToolAllow) > 0 && !mcpbridge.IsToolAllowed(name, state.Input.ToolAllow, nil) {
+			return false, "tool not in per-route allow: " + name
+		}
 
 		if allowed[name] {
 			return true, ""

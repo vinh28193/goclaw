@@ -34,5 +34,10 @@ type resolvedMessageContext struct {
 	messageThreadID int
 	dmThreadID      int
 
+	// wasMentioned is true if the bot was explicitly mentioned (including reply-to-bot
+	// or yield-mode catch-all). Always false for DMs (no mention concept). Consumed
+	// by the agent route resolver to evaluate routes with mention_required=true.
+	wasMentioned bool
+
 	topicCfg resolvedTopicConfig
 }

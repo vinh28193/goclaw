@@ -118,8 +118,91 @@
       "config": "Cấu hình",
       "credentials": "Thông tin xác thực",
       "groups": "Nhóm",
+      "agentRoutes": "Định tuyến agent",
       "contexts": "Ngữ cảnh",
       "managers": "Quản lý"
+    },
+    "agentRoutes": {
+      "title": "Định tuyến agent",
+      "description": "Định tuyến tin nhắn trong channel này tới các agent khác nhau theo loại chat, media, hoặc mention. Khớp đầu tiên thắng (priority ASC, created_at ASC). Không khớp → agent mặc định.",
+      "empty": "Chưa có rule — toàn bộ tin nhắn sẽ về agent mặc định.",
+      "mentionYes": "Bắt buộc",
+      "columns": {
+        "name": "Tên",
+        "agent": "Agent",
+        "peerKind": "Loại peer",
+        "mediaType": "Media",
+        "mention": "Mention",
+        "priority": "Ưu tiên",
+        "toolAllow": "Tools",
+        "enabled": "Bật",
+        "actions": "Hành động"
+      },
+      "peerKind": {
+        "direct": "DM",
+        "group": "Nhóm",
+        "supergroup": "Siêu nhóm"
+      },
+      "mediaType": {
+        "any": "Mọi loại",
+        "text": "Text",
+        "voice": "Voice",
+        "media": "Media"
+      },
+      "toolAllow": {
+        "inherit": "Kế thừa",
+        "count": "{{count}} tool",
+        "count_other": "{{count}} tools",
+        "inheritToggle": "Kế thừa",
+        "hint": "Mỗi dòng một tên MCP tool. Để trống + bật Kế thừa = dùng toàn bộ whitelist của agent."
+      },
+      "fields": {
+        "name": "Tên",
+        "agent": "Agent",
+        "peerKind": "Loại peer",
+        "mediaType": "Loại media",
+        "mentionRequired": "Bắt buộc mention bot",
+        "priority": "Ưu tiên",
+        "isEnabled": "Bật",
+        "toolAllow": "Tool allow",
+        "intent": "Intent",
+        "intentHint": "Tùy chọn. Đặt label cho classifier (vd: 'billing', 'support'). Để trống = match theo rule như cũ.",
+        "targetKind": "Loại đích"
+      },
+      "targetKind": {
+        "agent": "Agent",
+        "team": "Team"
+      },
+      "placeholders": {
+        "name": "VD: Partner DM",
+        "toolAllow": "generate_shortlink\nget_commission_for_url",
+        "intent": "VD: billing"
+      },
+      "actions": {
+        "add": "Thêm rule",
+        "edit": "Sửa",
+        "delete": "Xóa",
+        "cancel": "Hủy",
+        "save": "Lưu",
+        "create": "Tạo",
+        "refresh": "Làm mới"
+      },
+      "dialog": {
+        "createTitle": "Tạo rule định tuyến",
+        "editTitle": "Sửa rule định tuyến"
+      },
+      "deleteConfirm": {
+        "title": "Xóa rule định tuyến?",
+        "body": "Rule \"{{name}}\" sẽ bị xóa. Tin nhắn đang khớp sẽ rơi xuống rule tiếp theo hoặc agent mặc định."
+      },
+      "toast": {
+        "created": "Đã tạo rule",
+        "updated": "Đã cập nhật rule",
+        "deleted": "Đã xóa rule",
+        "failedCreate": "Tạo rule thất bại",
+        "failedUpdate": "Cập nhật rule thất bại",
+        "failedDelete": "Xóa rule thất bại"
+      }
     },
     "general": {
       "identity": "Thông tin",

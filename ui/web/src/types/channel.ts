@@ -123,6 +123,41 @@ export interface ChannelContextMember {
   last_seen_at?: string;
 }
 
+export type AgentRoutePeerKind = "direct" | "group" | "supergroup";
+export type AgentRouteMediaType = "text" | "voice" | "media" | null;
+export type AgentRouteTargetKind = "agent" | "team";
+
+export interface ChannelAgentRoute {
+  id: string;
+  tenant_id: string;
+  channel_instance_id: string;
+  agent_id: string;
+  name: string;
+  peer_kind: AgentRoutePeerKind;
+  media_type: AgentRouteMediaType;
+  mention_required: boolean;
+  priority: number;
+  is_enabled: boolean;
+  tool_allow: string[] | null;
+  intent: string | null;
+  target_kind: AgentRouteTargetKind;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChannelAgentRouteInput {
+  name?: string;
+  agent_id: string;
+  peer_kind: AgentRoutePeerKind;
+  media_type?: AgentRouteMediaType;
+  mention_required?: boolean;
+  priority?: number;
+  is_enabled?: boolean;
+  tool_allow?: string[] | null;
+  intent?: string | null;
+  target_kind?: AgentRouteTargetKind;
+}
+
 export interface ChannelCapability {
   type: "mcp_server" | "secure_cli";
   id: string;

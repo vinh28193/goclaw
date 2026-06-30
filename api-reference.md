@@ -14,6 +14,51 @@
 | GET/POST/PUT/DELETE | `/v1/tools/custom/*` | Custom tool CRUD |
 | GET/POST/PUT/DELETE | `/v1/mcp/*` | MCP server + grants management |
 | GET | `/v1/traces/*` | Trace viewer |
+| GET/POST/PATCH/DELETE | `/v1/channels/instances/{id}/agent-routes/*` | Per-channel agent routing rules |
+
+## Channel Agent Routes
+
+Route inbound messages on one channel instance to N backend agents using deterministic match rules. Single bot per channel can dispatch to a `partner` agent for DMs, an `admin` agent for group+mention, a `voice` agent for audio messages, etc. — without sharing tools across agents.
+
+**Match conditions:** `peer_kind` (direct/group/supergroup) + `media_type` (text/voice/media/null=any) + `mention_required`. Routes are evaluated by `priority ASC, created_at ASC`; first match wins. No match → fall back to `channel_instances.agent_id`.
+
+**Per-route `tool_allow`:** narrows the MCP tool whitelist for messages routed through this rule. `null` = inherit the agent's full whitelist. Defense-in-depth alongside backend MCP-key whitelist.
+
+**API:**
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/v1/channels/instances/{id}/agent-routes` | List routes for channel |
+| POST | `/v1/channels/instances/{id}/agent-routes` | Create route (admin) |
+| GET | `/v1/channels/instances/{id}/agent-routes/{rid}` | Get route |
+| PATCH | `/v1/channels/instances/{id}/agent-routes/{rid}` | Update route (admin) |
+| DELETE | `/v1/channels/instances/{id}/agent-routes/{rid}` | Delete route (admin) → 204 |
+
+**Create body:**
+
+```json
+{
+  "name": "Admin Group Routing",
+  "agent_id": "00000000-0000-0000-0000-000000000000",
+  "peer_kind": "group",
+  "media_type": null,
+  "mention_required": true,
+  "priority": 50,
+  "is_enabled": true,
+  "tool_allow": ["broadcast", "list_groups"]
+}
+```
+
+- `peer_kind`: `direct` | `group` | `supergroup` (required).
+- `media_type`: `null` (any) | `text` | `voice` | `media`.
+- `tool_allow`: `null` (inherit agent's full whitelist) | array of MCP tool names. Empty array collapses to `null`.
+- `priority`: lower = higher precedence. Default 100. Tie-break by `created_at ASC`.
+- `mention_required`: only matches when the inbound message @-mentions this channel's bot.
+
+All mutations invalidate the in-process route cache so subsequent inbound messages see the new rule within milliseconds.
+
+**Migration of legacy `VoiceAgentID`:** boot-time job migrates any channel-instance config field `voice_agent_id` into a route row with `peer_kind=direct, media_type=voice, priority=50, is_enabled=true`. Idempotent across boots.
+
 
 ## Custom Tools
 

@@ -21,6 +21,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/cache"
 	"github.com/nextlevelbuilder/goclaw/internal/channelmemory"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/routing"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/bitrix24"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/discord"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/facebook"
@@ -503,6 +504,43 @@ func runGateway() {
 	channelMgr := channels.NewManager(msgBus)
 	deps.channelMgr = channelMgr
 
+	// Per-channel agent route resolver (multi-agent routing). Singleton — phase 04
+	// handlers call deps.routeResolver.Resolve(...) before PublishInbound; phase 05
+	// REST mutations call Invalidate.
+	if pgStores.ChannelAgentRoutes != nil {
+		deps.routeResolver = routing.NewAgentRouteResolver(pgStores.ChannelAgentRoutes, 0)
+
+		// Sticky routing: same (channel, peer) → same agent until TTL expires.
+		// Optional — when ChannelRoutingAffinity store is absent (legacy SQLite
+		// schema before migration 082) we run pure rule-based mode.
+		if pgStores.ChannelRoutingAffinity != nil {
+			deps.routeResolver.SetAffinityStore(pgStores.ChannelRoutingAffinity, 0)
+		}
+
+		// Multi-node route-invalidation fan-out via Redis pub/sub. No-op when
+		// goclaw is built without `-tags redis` OR when GOCLAW_REDIS_DSN is unset
+		// (initRedisClient returned nil). The TTL on the resolver cache is the
+		// safety net for the single-node case.
+		stopRouteInvalidate, err := routing.StartRedisInvalidate(redisClient, deps.routeResolver)
+		if err != nil {
+			slog.Warn("route_invalidate redis wire-up failed; falling back to TTL-only",
+				"err", err)
+		}
+		defer stopRouteInvalidate()
+
+		// REST CRUD for /v1/channels/instances/{id}/agent-routes. Mutations
+		// invalidate the resolver cache so the next inbound sees the new rule
+		// without waiting for TTL.
+		routesH := httpapi.NewChannelAgentRoutesHandler(
+			pgStores.ChannelAgentRoutes,
+			pgStores.ChannelInstances,
+			pgStores.Agents,
+			pgStores.Tenants,
+			deps.routeResolver,
+		)
+		server.SetChannelAgentRoutesHandler(routesH)
+	}
+
 	// Bind the channel manager to the wake handler so backend-initiated
 	// `is_system_command` wake requests (send_chat_message /
 	// send_pdf_attachment) dispatch straight to channels without the LLM loop.
@@ -542,6 +580,9 @@ func runGateway() {
 		instanceLoader.SetProviderRegistry(providerRegistry)
 		instanceLoader.SetPendingCompactionConfig(cfg.Channels.PendingCompaction)
 		instanceLoader.SetUsageCapService(usageCapSvc)
+		if deps.routeResolver != nil {
+			instanceLoader.SetRouteResolver(deps.routeResolver)
+		}
 		instanceLoader.RegisterFactory(channels.TypeTelegram, telegram.FactoryWithStoresAndAudio(pgStores.Agents, pgStores.ConfigPermissions, pgStores.Teams, pgStores.SubagentTasks, pgStores.PendingMessages, audioMgr))
 		instanceLoader.RegisterFactory(channels.TypeDiscord, discord.FactoryWithStoresAndAudio(pgStores.Agents, pgStores.ConfigPermissions, pgStores.PendingMessages, audioMgr))
 		instanceLoader.RegisterFactory(channels.TypeFeishu, feishu.FactoryWithPendingStoreAndAudio(pgStores.PendingMessages, audioMgr))
@@ -564,6 +605,21 @@ func runGateway() {
 		// identically to before — the MCPStore arg is nil-safe inside the
 		// factory.
 		instanceLoader.RegisterFactory(channels.TypeBitrix24, bitrix24.FactoryWithPortalStoreAndMCP(pgStores.BitrixPortals, pgStores.MCP, bitrixEncKey))
+
+		// One-shot legacy VoiceAgentID → channel_agent_routes migration. Runs
+		// BEFORE channels load so the resolver sees the migrated rows on the
+		// first message. Idempotent; safe to re-run on every boot.
+		if pgStores.ChannelAgentRoutes != nil {
+			if _, _, err := routing.MigrateVoiceAgentIDs(
+				context.Background(),
+				pgStores.ChannelInstances,
+				pgStores.ChannelAgentRoutes,
+				pgStores.Agents,
+			); err != nil {
+				slog.Warn("voice_agent_id migration failed", "err", err)
+			}
+		}
+
 		if err := instanceLoader.LoadAll(context.Background()); err != nil {
 			slog.Error("failed to load channel instances from DB", "error", err)
 		}

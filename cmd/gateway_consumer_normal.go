@@ -31,11 +31,11 @@ const slowRunAckDelay = 15 * time.Second
 // across turns reads as robotic. Selected by run-id hash so a single run
 // stays consistent and pool entries spread across runs.
 var slowRunAckMessages = []string{
-	"⏳ Đợi em xíu nha, em đang tra cứu giúp mình...",
-	"🙏 Em xin lỗi đợi hơi lâu, em xử lý nốt đây nha...",
-	"👀 Cho em thêm xíu nữa nhé, sắp xong rồi...",
-	"✨ Anh/chị đợi em chút nha, mạng đang chậm xíu...",
-	"🔎 Em check kỹ tí xíu nữa nha, gần xong rồi đây...",
+	"⏳ Đợi em xíu nha...",
+	"🙏 Em xin lỗi đợi hơi lâu nha...",
+	"👀 Cho em thêm chút nữa nhé...",
+	"✨ Anh/chị đợi em xíu, mạng đang chậm...",
+	"🤔 Em đang nghĩ, đợi em chút...",
 }
 
 // pickSlowRunAck deterministically chooses an interim phrasing for a run.
@@ -71,6 +71,21 @@ func processNormalMessage(
 	agentID := msg.AgentID
 	if agentID == "" {
 		agentID = resolveAgentRoute(deps.Cfg, msg.Channel, msg.ChatID, msg.PeerKind)
+	}
+
+	// Team target (Path 4): when the channel route resolved to a team, treat
+	// msg.AgentID as the team UUID and execute through the team's LEAD agent.
+	// The lead delegates to members via the team_tasks tool (lead-coordinated
+	// execution model — no separate orchestration primitive needed). Fail-open:
+	// any error falls back to the default channel agent so inbound never drops.
+	var teamScopeID string
+	if msg.TargetKind == store.RouteTargetTeam {
+		if leadID, scopeID, ok := resolveTeamTarget(ctx, deps.TeamStore, agentID, msg.Channel); ok {
+			agentID = leadID
+			teamScopeID = scopeID
+		} else {
+			agentID = resolveAgentRoute(deps.Cfg, msg.Channel, msg.ChatID, msg.PeerKind)
+		}
 	}
 
 	agentLoop, err := deps.Agents.Get(ctx, agentID)
@@ -445,6 +460,13 @@ func processNormalMessage(
 	ptd := tools.NewPendingTeamDispatch()
 	schedCtx := tools.WithPendingTeamDispatch(ctx, ptd)
 
+	// Path 4 team route: pin the resolved team ID so team_tasks tool calls
+	// inside the lead's loop use this team explicitly (handles multi-team
+	// leads correctly instead of falling back to GetTeamForAgent).
+	if teamScopeID != "" {
+		schedCtx = tools.WithToolTeamID(schedCtx, teamScopeID)
+	}
+
 	// Propagate run_kind from metadata (e.g. "notification" for team task status relays).
 	if rk := msg.Metadata["run_kind"]; rk != "" {
 		schedCtx = tools.WithRunKind(schedCtx, rk)
@@ -573,13 +595,42 @@ func processNormalMessage(
 			}
 			slog.Error("inbound: agent run failed", "error", outcome.Err, "channel", channel)
 			// Forward classified (safe, sanitized) error messages to all channels so
-			// end users see something instead of silent failure. Only suppress
-			// unclassified fallbacks on public-facing channels to avoid leaking internals.
+			// end users see something instead of silent failure. For unclassified
+			// errors on public-facing channels, reply with a generic friendly
+			// message instead of leaking raw error text — never go silent.
 			errContent, classified := formatAgentError(outcome.Err)
 			if !classified && deps.ChannelMgr != nil {
 				if ct := deps.ChannelMgr.ChannelTypeForName(channel); isExternalChannel(ct) {
-					slog.Info("inbound: suppressed unclassified error for external channel", "channel", channel, "type", ct)
-					errContent = ""
+					slog.Info("inbound: replacing unclassified error with generic friendly message",
+						"channel", channel, "type", ct)
+					errContent = "😅 Có chút trục trặc anh ơi, anh thử lại nha 🙏"
+				}
+			}
+			// Offline URL fallback — when LLM is transiently down (rate limit /
+			// overload / timeout) AND the inbound contains a URL, dispatch MCP
+			// tools directly via the agent's tool registry (skipping LLM) and
+			// compose the reply here in Go. Brain stays in goclaw; backend stays
+			// as a tool primitive provider only.
+			slog.Info("offline_url_check",
+				"is_transient", isTransientLLMError(outcome.Err),
+				"has_agentLoop", agentLoop != nil,
+				"inbound_content_len", len(inboundContent),
+				"extracted_url", extractFirstURL(inboundContent))
+			if isTransientLLMError(outcome.Err) {
+				url := extractFirstURL(inboundContent)
+				if url != "" && agentLoop != nil {
+					slog.Info("inbound: attempting offline url fallback", "url", url)
+					// Inject agent + tenant context so MCP bridge grant check passes.
+					fbCtx := store.WithAgentID(ctx, agentUUID)
+					fbCtx = store.WithTenantID(fbCtx, tenantID)
+					if reply := composeOfflineURLReply(fbCtx, agentLoop, url); reply != "" {
+						slog.Info("inbound: offline url fallback engaged (MCP)",
+							"channel", channel, "url", url)
+						// DEV-ONLY prefix — remove when going to prod.
+						errContent = "[fallback]\n" + reply
+					} else {
+						slog.Warn("inbound: offline url fallback returned empty", "url", url)
+					}
 				}
 			}
 			deps.MsgBus.PublishOutbound(bus.OutboundMessage{

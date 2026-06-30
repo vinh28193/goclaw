@@ -6,6 +6,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/cache"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/routing"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/eventbus"
 	"github.com/nextlevelbuilder/goclaw/internal/gateway"
@@ -27,6 +28,7 @@ type gatewayDeps struct {
 	pgStores         *store.Stores
 	providerRegistry *providers.Registry
 	channelMgr       *channels.Manager
+	routeResolver    *routing.AgentRouteResolver // nil if pgStores.ChannelAgentRoutes is nil
 	agentRouter      *agent.Router
 	toolsReg         *tools.Registry
 	skillsLoader     *skills.Loader         // optional: enables skill creation in evolution approval

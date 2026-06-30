@@ -119,8 +119,91 @@
       "config": "Config",
       "credentials": "Credentials",
       "groups": "Groups",
+      "agentRoutes": "Agent Routes",
       "contexts": "Contexts",
       "managers": "Managers"
+    },
+    "agentRoutes": {
+      "title": "Agent Routes",
+      "description": "Route messages on this channel to different agents based on chat type, media, or mention. First match wins (priority ASC, created_at ASC). No match → default agent.",
+      "empty": "No routes — inbound messages all go to the default agent.",
+      "mentionYes": "Required",
+      "columns": {
+        "name": "Name",
+        "agent": "Agent",
+        "peerKind": "Peer kind",
+        "mediaType": "Media",
+        "mention": "Mention",
+        "priority": "Priority",
+        "toolAllow": "Tools",
+        "enabled": "Enabled",
+        "actions": "Actions"
+      },
+      "peerKind": {
+        "direct": "Direct (DM)",
+        "group": "Group",
+        "supergroup": "Supergroup"
+      },
+      "mediaType": {
+        "any": "Any",
+        "text": "Text",
+        "voice": "Voice",
+        "media": "Media"
+      },
+      "toolAllow": {
+        "inherit": "Inherit",
+        "count": "{{count}} tool",
+        "count_other": "{{count}} tools",
+        "inheritToggle": "Inherit",
+        "hint": "One MCP tool name per line. Leave empty + Inherit ON to use the agent's full whitelist."
+      },
+      "fields": {
+        "name": "Name",
+        "agent": "Agent",
+        "peerKind": "Peer kind",
+        "mediaType": "Media type",
+        "mentionRequired": "Bot must be mentioned",
+        "priority": "Priority",
+        "isEnabled": "Enabled",
+        "toolAllow": "Tool allow",
+        "intent": "Intent label",
+        "intentHint": "Optional. Set with a classifier label (e.g. 'billing', 'support'). Leave empty for rule-only matching.",
+        "targetKind": "Target type"
+      },
+      "targetKind": {
+        "agent": "Agent",
+        "team": "Team"
+      },
+      "placeholders": {
+        "name": "e.g. Partner DM",
+        "toolAllow": "generate_shortlink\nget_commission_for_url",
+        "intent": "e.g. billing"
+      },
+      "actions": {
+        "add": "Add route",
+        "edit": "Edit",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "save": "Save",
+        "create": "Create",
+        "refresh": "Refresh"
+      },
+      "dialog": {
+        "createTitle": "Create agent route",
+        "editTitle": "Edit agent route"
+      },
+      "deleteConfirm": {
+        "title": "Delete agent route?",
+        "body": "Route \"{{name}}\" will be removed. Messages it currently catches will fall back to the next match or the default agent."
+      },
+      "toast": {
+        "created": "Route created",
+        "updated": "Route updated",
+        "deleted": "Route deleted",
+        "failedCreate": "Failed to create route",
+        "failedUpdate": "Failed to update route",
+        "failedDelete": "Failed to delete route"
+      }
     },
     "general": {
       "identity": "Identity",

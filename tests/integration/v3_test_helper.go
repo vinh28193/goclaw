@@ -94,12 +94,14 @@ func seedTenantAgent(t *testing.T, db *sql.DB) (tenantID, agentID uuid.UUID) {
 		t.Fatalf("seed tenant: %v", err)
 	}
 
-	// Insert agent (minimal required fields including owner_id).
+	// Insert agent (minimal required fields including owner_id + display_name).
+	// display_name is schema-nullable but PGAgentStore.scanAgentRow scans into
+	// plain string, so a NULL would fail any read-back via GetByID/GetByKey.
 	_, err = db.Exec(
-		`INSERT INTO agents (id, tenant_id, agent_key, agent_type, status, provider, model, owner_id)
-		 VALUES ($1, $2, $3, 'predefined', 'active', 'test', 'test-model', 'test-owner')
+		`INSERT INTO agents (id, tenant_id, agent_key, display_name, agent_type, status, provider, model, owner_id)
+		 VALUES ($1, $2, $3, $4, 'predefined', 'active', 'test', 'test-model', 'test-owner')
 		 ON CONFLICT DO NOTHING`,
-		agentID, tenantID, agentKey)
+		agentID, tenantID, agentKey, agentKey)
 	if err != nil {
 		t.Fatalf("seed agent: %v", err)
 	}

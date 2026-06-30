@@ -10,7 +10,7 @@ var ValidColumnName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 // Used by BuildMapUpdate to auto-set updated_at on writes.
 var TablesWithUpdatedAt = map[string]bool{
 	"agents": true, "llm_providers": true, "sessions": true,
-	"channel_instances": true, "cron_jobs": true,
+	"channel_instances": true, "channel_agent_routes": true, "cron_jobs": true,
 	"skills": true, "mcp_servers": true, "agent_links": true,
 	"agent_teams": true, "team_tasks": true, "builtin_tools": true,
 	"agent_context_files": true, "user_context_files": true,

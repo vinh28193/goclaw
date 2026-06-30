@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/routing"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/providerresolve"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
@@ -41,6 +42,7 @@ type InstanceLoader struct {
 	providerReg       *providers.Registry
 	pendingCompactCfg *config.PendingCompactionConfig
 	usageCaps         *usagecaps.Service
+	routeResolver     *routing.AgentRouteResolver // nil = legacy single-agent channels only
 	factories         map[string]ChannelFactory
 	manager           *Manager
 	msgBus            *bus.MessageBus
@@ -82,6 +84,13 @@ func (l *InstanceLoader) SetPendingCompactionConfig(cfg *config.PendingCompactio
 
 func (l *InstanceLoader) SetUsageCapService(s *usagecaps.Service) {
 	l.usageCaps = s
+}
+
+// SetRouteResolver wires the agent route resolver. Each loaded channel that
+// embeds *BaseChannel receives a reference, enabling per-channel multi-agent
+// routing via channel_agent_routes. Must be called before LoadAll/Reload.
+func (l *InstanceLoader) SetRouteResolver(r *routing.AgentRouteResolver) {
+	l.routeResolver = r
 }
 
 // RegisterFactory registers a factory for a channel type (e.g., "telegram", "discord").
@@ -311,6 +320,19 @@ func (l *InstanceLoader) loadInstance(ctx context.Context, inst store.ChannelIns
 	// Propagate tenant_id from DB instance to channel for tenant-scoped message handling.
 	if base, ok := ch.(interface{ SetTenantID(uuid.UUID) }); ok {
 		base.SetTenantID(inst.TenantID)
+	}
+	// Propagate channel_instance.id so handlers can call the agent route resolver.
+	if base, ok := ch.(interface{ SetInstanceID(uuid.UUID) }); ok {
+		base.SetInstanceID(inst.ID)
+	}
+	// Propagate the route resolver singleton (nil-safe — channels skip the
+	// per-route lookup when resolver is nil).
+	if l.routeResolver != nil {
+		if base, ok := ch.(interface {
+			SetRouteResolver(*routing.AgentRouteResolver)
+		}); ok {
+			base.SetRouteResolver(l.routeResolver)
+		}
 	}
 	// Propagate tenant_id to pending history for compaction/sweep DB operations.
 	// Factory creates PendingHistory before SetTenantID is called, so tenantID is uuid.Nil at construction.

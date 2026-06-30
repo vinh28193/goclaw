@@ -96,8 +96,9 @@ type TelegramConfig struct {
 	STTTenantID       string `json:"stt_tenant_id,omitempty"`       // optional tenant/org identifier forwarded to the STT proxy
 	STTTimeoutSeconds int    `json:"stt_timeout_seconds,omitempty"` // per-request timeout for STT calls (default 30s)
 
-	// Optional audio-aware routing: when set, voice/audio inbound messages are routed to this
-	// agent instead of the default channel agent. Requires the named agent to exist in the config.
+	// Deprecated: use channel_agent_routes with media_type=voice. Boot-time migration
+	// (routing.MigrateVoiceAgentIDs) auto-inserts a route row from this field — kept
+	// for backward-compat config parsing; will be removed in a future release.
 	VoiceAgentID string `json:"voice_agent_id,omitempty"` // agent ID to route voice inbound to (e.g. "speaking-agent")
 
 	// Audio guard: intercept technical errors in voice agent replies and replace with friendly fallbacks.
@@ -154,7 +155,7 @@ type DiscordConfig struct {
 	STTAPIKey         string              `json:"stt_api_key,omitempty"`
 	STTTenantID       string              `json:"stt_tenant_id,omitempty"`
 	STTTimeoutSeconds int                 `json:"stt_timeout_seconds,omitempty"`
-	VoiceAgentID      string              `json:"voice_agent_id,omitempty"`
+	VoiceAgentID      string              `json:"voice_agent_id,omitempty"` // Deprecated: use channel_agent_routes (media_type=voice); auto-migrated on boot.
 }
 
 type SlackConfig struct {
@@ -242,7 +243,7 @@ type FeishuConfig struct {
 	STTAPIKey         string              `json:"stt_api_key,omitempty"`
 	STTTenantID       string              `json:"stt_tenant_id,omitempty"`
 	STTTimeoutSeconds int                 `json:"stt_timeout_seconds,omitempty"`
-	VoiceAgentID      string              `json:"voice_agent_id,omitempty"`
+	VoiceAgentID      string              `json:"voice_agent_id,omitempty"` // Deprecated: use channel_agent_routes (media_type=voice); auto-migrated on boot.
 }
 
 // ProvidersConfig maps provider name to its config.

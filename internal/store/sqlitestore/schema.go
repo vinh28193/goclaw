@@ -16,7 +16,7 @@ var schemaSQL string
 
 // SchemaVersion is the current SQLite schema version.
 // Bump this when adding new migration steps below.
-const SchemaVersion = 49
+const SchemaVersion = 53
 
 // migrations maps version → SQL to apply when upgrading FROM that version.
 // schema.sql always represents the LATEST full schema (for fresh DBs).
@@ -852,6 +852,14 @@ CREATE INDEX IF NOT EXISTS idx_skill_user_grants_tenant ON skill_user_grants(ten
 	47: addSkillSelfEvolutionTables,
 	// Version 48 → 49: append-only usage event analytics.
 	48: addUsageEventAnalyticsTables,
+	// Version 49 → 50: channel_agent_routes for shared-bot multi-agent routing.
+	49: addChannelAgentRoutesTable,
+	// Version 50 → 51: channel_routing_affinity for sticky (channel, peer) → agent.
+	50: addChannelRoutingAffinityTable,
+	// Version 51 → 52: channel_agent_routes.intent for LLM intent classifier.
+	51: addChannelAgentRoutesIntentColumn,
+	// Version 52 → 53: channel_agent_routes.target_kind for agent vs team dispatch.
+	52: addChannelAgentRoutesTargetKindColumn,
 }
 
 const addUsageEventAnalyticsTables = `
@@ -939,6 +947,57 @@ CREATE INDEX IF NOT EXISTS idx_usage_event_rollups_tenant_hour
     ON usage_event_rollups(tenant_id, bucket_hour DESC);
 CREATE INDEX IF NOT EXISTS idx_usage_event_rollups_resource_hour
     ON usage_event_rollups(tenant_id, resource_type, resource_name, bucket_hour DESC);`
+
+const addChannelAgentRoutesTargetKindColumn = `
+ALTER TABLE channel_agent_routes ADD COLUMN target_kind VARCHAR(20) NOT NULL DEFAULT 'agent';
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_target
+    ON channel_agent_routes(target_kind, agent_id);`
+
+const addChannelAgentRoutesIntentColumn = `
+ALTER TABLE channel_agent_routes ADD COLUMN intent VARCHAR(50);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_channel_intent
+    ON channel_agent_routes(channel_instance_id, intent)
+    WHERE intent IS NOT NULL;`
+
+const addChannelRoutingAffinityTable = `
+CREATE TABLE IF NOT EXISTS channel_routing_affinity (
+    tenant_id           TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    channel_instance_id TEXT NOT NULL REFERENCES channel_instances(id) ON DELETE CASCADE,
+    peer_id             VARCHAR(255) NOT NULL,
+    agent_id            TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    tool_allow          TEXT NULL,
+    expires_at          TEXT NOT NULL,
+    created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (tenant_id, channel_instance_id, peer_id)
+);
+CREATE INDEX IF NOT EXISTS idx_channel_routing_affinity_lookup
+    ON channel_routing_affinity(channel_instance_id, peer_id, expires_at);
+CREATE INDEX IF NOT EXISTS idx_channel_routing_affinity_expired
+    ON channel_routing_affinity(expires_at);`
+
+const addChannelAgentRoutesTable = `
+CREATE TABLE IF NOT EXISTS channel_agent_routes (
+    id                  TEXT PRIMARY KEY,
+    tenant_id           TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    channel_instance_id TEXT NOT NULL REFERENCES channel_instances(id) ON DELETE CASCADE,
+    agent_id            TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    name                VARCHAR(100) NOT NULL DEFAULT '',
+    peer_kind           VARCHAR(20) NOT NULL CHECK (peer_kind IN ('direct','group','supergroup')),
+    media_type          VARCHAR(20) NULL CHECK (media_type IS NULL OR media_type IN ('text','voice','media')),
+    mention_required    INTEGER NOT NULL DEFAULT 0,
+    priority            INTEGER NOT NULL DEFAULT 100,
+    is_enabled          INTEGER NOT NULL DEFAULT 1,
+    tool_allow          TEXT NULL,
+    created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_channel_enabled_priority
+    ON channel_agent_routes(channel_instance_id, is_enabled, priority);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_tenant_instance
+    ON channel_agent_routes(tenant_id, channel_instance_id);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_agent
+    ON channel_agent_routes(agent_id);`
 
 const addSkillSelfEvolutionTables = `
 CREATE TABLE IF NOT EXISTS skill_evolution_settings (

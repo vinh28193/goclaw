@@ -31,7 +31,11 @@ type InboundMessage struct {
 	UserID       string            `json:"user_id,omitempty"`       // external user ID for per-user scoping (memory, bootstrap)
 	HistoryLimit int               `json:"history_limit,omitempty"` // max turns to keep in context (0=unlimited, from channel config)
 	ToolAllow    []string          `json:"tool_allow,omitempty"`    // per-group tool allow list (nil = no restriction)
-	Metadata     map[string]string `json:"metadata,omitempty"`
+	// TargetKind (Path 4): "agent" (default) or "team". When "team", AgentID
+	// is reinterpreted as agent_teams.id; consumer dispatches via
+	// internal/orchestration team-task primitives instead of single-agent loop.
+	TargetKind string            `json:"target_kind,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
 }
 
 // OutboundMessage represents a message to be sent to a channel.

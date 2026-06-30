@@ -2278,3 +2278,56 @@ CREATE TABLE IF NOT EXISTS skill_versions (
     UNIQUE(skill_id, version)
 );
 CREATE INDEX IF NOT EXISTS idx_skill_versions_tenant_skill ON skill_versions(tenant_id, skill_id, version DESC);
+
+-- channel_agent_routes: shared-bot multi-agent routing (mirror of PG migration 000081).
+-- Resolver picks (agent_id, tool_allow) by matching (channel_instance_id, peer_kind, media_type, mention_required)
+-- with tie-break priority ASC, created_at ASC. channel_instances.agent_id remains the default fallback.
+CREATE TABLE IF NOT EXISTS channel_agent_routes (
+    id                  TEXT PRIMARY KEY,
+    tenant_id           TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    channel_instance_id TEXT NOT NULL REFERENCES channel_instances(id) ON DELETE CASCADE,
+    agent_id            TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    name                VARCHAR(100) NOT NULL DEFAULT '',
+    peer_kind           VARCHAR(20) NOT NULL CHECK (peer_kind IN ('direct','group','supergroup')),
+    media_type          VARCHAR(20) NULL CHECK (media_type IS NULL OR media_type IN ('text','voice','media')),
+    mention_required    INTEGER NOT NULL DEFAULT 0,
+    priority            INTEGER NOT NULL DEFAULT 100,
+    is_enabled          INTEGER NOT NULL DEFAULT 1,
+    tool_allow          TEXT NULL,
+    created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_channel_enabled_priority
+    ON channel_agent_routes(channel_instance_id, is_enabled, priority);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_tenant_instance
+    ON channel_agent_routes(tenant_id, channel_instance_id);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_agent
+    ON channel_agent_routes(agent_id);
+-- Path 1: LLM intent classifier (migration 083). NULL = rule-only matching.
+ALTER TABLE channel_agent_routes ADD COLUMN intent VARCHAR(50);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_channel_intent
+    ON channel_agent_routes(channel_instance_id, intent)
+    WHERE intent IS NOT NULL;
+-- Path 4: agent-team target (migration 084). 'agent' (default) or 'team'.
+ALTER TABLE channel_agent_routes ADD COLUMN target_kind VARCHAR(20) NOT NULL DEFAULT 'agent';
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_target
+    ON channel_agent_routes(target_kind, agent_id);
+
+-- channel_routing_affinity: sticky (channel, peer) → agent binding (mirror of PG migration 000082).
+-- Resolver checks affinity FIRST (short-circuit), then falls through to rule eval, then upserts.
+-- Snapshot semantics: tool_allow captured at bind time, immune to mid-conversation rule edits.
+CREATE TABLE IF NOT EXISTS channel_routing_affinity (
+    tenant_id           TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    channel_instance_id TEXT NOT NULL REFERENCES channel_instances(id) ON DELETE CASCADE,
+    peer_id             VARCHAR(255) NOT NULL,
+    agent_id            TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    tool_allow          TEXT NULL,
+    expires_at          TEXT NOT NULL,
+    created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (tenant_id, channel_instance_id, peer_id)
+);
+CREATE INDEX IF NOT EXISTS idx_channel_routing_affinity_lookup
+    ON channel_routing_affinity(channel_instance_id, peer_id, expires_at);
+CREATE INDEX IF NOT EXISTS idx_channel_routing_affinity_expired
+    ON channel_routing_affinity(expires_at);

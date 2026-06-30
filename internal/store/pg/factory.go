@@ -36,6 +36,8 @@ func NewPGStores(cfg store.StoreConfig) (*store.Stores, error) {
 		RunTimeline:            NewPGRunTimelineStore(db),
 		MCP:                    NewPGMCPServerStore(db, cfg.EncryptionKey),
 		ChannelInstances:       NewPGChannelInstanceStore(db, cfg.EncryptionKey),
+		ChannelAgentRoutes:     NewPGChannelAgentRouteStore(db),
+		ChannelRoutingAffinity: NewPGChannelRoutingAffinityStore(db),
 		ConfigSecrets:          NewPGConfigSecretsStore(db, cfg.EncryptionKey),
 		AgentLinks:             NewPGAgentLinkStore(db),
 		Teams:                  NewPGTeamStore(db),

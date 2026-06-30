@@ -11,6 +11,7 @@ import { ChannelCredentialsTab } from "./channel-credentials-tab";
 import { ChannelGroupsTab } from "./channel-groups-tab";
 import { ChannelManagersTab } from "./channel-managers-tab";
 import { ChannelContextsTab } from "./channel-contexts-tab";
+import { ChannelAgentRoutesTab } from "./channel-agent-routes-tab";
 import { ChannelDiagnosticsCard } from "./channel-diagnostics-card";
 import { PassiveMemorySection } from "./passive-memory-section";
 import { DetailPageSkeleton } from "@/components/shared/loading-skeleton";
@@ -32,7 +33,7 @@ interface ChannelDetailPageProps {
 }
 
 const DEFAULT_CHANNEL_DETAIL_TAB = "general";
-const baseChannelDetailTabs = new Set(["general", "credentials", "contexts", "managers"]);
+const baseChannelDetailTabs = new Set(["general", "credentials", "agent-routes", "contexts", "managers"]);
 
 export function resolveChannelDetailTab(
   requestedTab: string | null,
@@ -209,6 +210,9 @@ export function ChannelDetailPage({
                   {t("detail.tabs.groups")}
                 </TabsTrigger>
               )}
+              <TabsTrigger value="agent-routes">
+                {t("detail.tabs.agentRoutes")}
+              </TabsTrigger>
               <TabsTrigger value="contexts">
                 {t("detail.tabs.contexts")}
               </TabsTrigger>
@@ -241,6 +245,10 @@ export function ChannelDetailPage({
                 />
               </TabsContent>
             )}
+
+            <TabsContent value="agent-routes" className="mt-4">
+              <ChannelAgentRoutesTab instanceId={instance.id} agents={agents} />
+            </TabsContent>
 
             <TabsContent value="contexts" className="mt-4">
               <ChannelContextsTab

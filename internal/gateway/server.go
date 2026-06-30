@@ -480,6 +480,11 @@ func (s *Server) SetChannelInstancesHandler(h *httpapi.ChannelInstancesHandler) 
 	s.handlers = append(s.handlers, h)
 }
 
+// SetChannelAgentRoutesHandler sets the per-channel agent-route CRUD handler.
+func (s *Server) SetChannelAgentRoutesHandler(h *httpapi.ChannelAgentRoutesHandler) {
+	s.handlers = append(s.handlers, h)
+}
+
 // SetProvidersHandler sets the provider CRUD handler.
 func (s *Server) SetProvidersHandler(h *httpapi.ProvidersHandler) {
 	s.handlers = append(s.handlers, h)

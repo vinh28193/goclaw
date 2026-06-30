@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
+	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
 // Agent is the core abstraction for an AI agent execution loop.
@@ -20,4 +21,9 @@ type Agent interface {
 	Model() string
 	ProviderName() string
 	Provider() providers.Provider
+
+	// CallTool dispatches a registered tool by name outside the LLM loop.
+	// Used by gateway-level fallback paths when the LLM is unavailable.
+	// Returns (nil, false) when the tool isn't registered.
+	CallTool(ctx context.Context, name string, args map[string]any) (*tools.Result, bool)
 }

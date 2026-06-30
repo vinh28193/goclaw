@@ -47,6 +47,7 @@ export const queryKeys = {
       ["channels", "detail", id, "contexts", scopeType, scopeKey, "members"] as const,
     contextCapabilities: (id: string, scopeType: string, scopeKey: string) =>
       ["channels", "detail", id, "contexts", scopeType, scopeKey, "capabilities"] as const,
+    agentRoutes: (id: string) => ["channels", "detail", id, "agent-routes"] as const,
   },
   contacts: {
     all: ["contacts"] as const,

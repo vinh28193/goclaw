@@ -16,6 +16,8 @@ type Stores struct {
 	RunTimeline           RunTimelineStore
 	MCP                   MCPServerStore
 	ChannelInstances      ChannelInstanceStore
+	ChannelAgentRoutes    ChannelAgentRouteStore
+	ChannelRoutingAffinity ChannelRoutingAffinityStore
 	ConfigSecrets         ConfigSecretsStore
 	AgentLinks            AgentLinkStore
 	Teams                 TeamStore

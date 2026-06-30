@@ -13,7 +13,9 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/audio"
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/routing"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/typing"
+	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
@@ -250,6 +252,11 @@ func (c *Channel) handleMessage(ctx context.Context, update telego.Update) {
 	//   "strict" (default): only respond when explicitly @mentioned (require_mention=true)
 	//   "yield": respond to all messages UNLESS another bot/user is @mentioned (and not us)
 	//            — enables "shared group" where all bots listen, but yield when someone is called by name
+	//
+	// wasMentioned is hoisted out of the gating block so processResolvedMessage can
+	// pass it to the agent route resolver (mention_required routes). False for DMs
+	// and for groups where mention gating is bypassed.
+	var wasMentioned bool
 	mentionMode := topicCfg.effectiveMentionMode(c.mentionMode)
 	if isGroup && (topicCfg.effectiveRequireMention(c.RequireMention()) || mentionMode == "yield") {
 		botUsername := c.bot.Username()
@@ -285,7 +292,7 @@ func (c *Channel) handleMessage(ctx context.Context, update telego.Update) {
 			return
 		}
 
-		wasMentioned := c.detectMention(message, botUsername)
+		wasMentioned = c.detectMention(message, botUsername)
 
 		// Reply to bot's message counts as implicit mention
 		if !wasMentioned && msgCtx.ReplyInfo != nil && msgCtx.ReplyInfo.IsBotReply {
@@ -401,6 +408,7 @@ func (c *Channel) handleMessage(ctx context.Context, update telego.Update) {
 		isForum:         isForum,
 		messageThreadID: messageThreadID,
 		dmThreadID:      dmThreadID,
+		wasMentioned:    wasMentioned,
 		topicCfg:        topicCfg,
 	}
 
@@ -662,21 +670,46 @@ func (c *Channel) processResolvedMessage(ctx context.Context, rctx resolvedMessa
 		peerKind = "group"
 	}
 
-	// Audio-aware routing: if a voice/audio message was received and a dedicated speaking agent
-	// is configured, route to that agent instead of the default channel agent.
-	// This prevents voice turns from landing on a text-router agent that cannot handle audio.
+	// Multi-agent routing via channel_agent_routes (route table is the single
+	// source of truth for agent + tool_allow per message). Legacy VoiceAgentID
+	// config is auto-migrated to a media_type=voice route row at startup, so
+	// voice goes through the resolver the same way as any other route.
 	targetAgentID := c.AgentID()
-	if c.config.VoiceAgentID != "" {
+	targetKind := store.RouteTargetAgent
+	var routeToolAllow []string
+	if c.RouteResolver() != nil && c.InstanceID() != uuidNil {
+		mediaTypes := make([]string, 0, len(mediaList))
 		for _, m := range mediaList {
-			if m.Type == "audio" || m.Type == "voice" {
-				targetAgentID = c.config.VoiceAgentID
-				slog.Debug("telegram: routing voice inbound to speaking agent",
-					"agent_id", targetAgentID, "media_type", m.Type,
-				)
-				break
-			}
+			mediaTypes = append(mediaTypes, m.Type)
+		}
+		mediaKind := routing.DeriveMediaKindFromMediaInfoTypes(mediaTypes)
+		// peerID for sticky: chatID alone for DM (=== senderID), composite for
+		// group so each user gets their own affinity even when admins chat.
+		peerID := rctx.chatIDStr
+		if rctx.chatIDStr != rctx.senderID {
+			peerID = rctx.chatIDStr + ":" + rctx.senderID
+		}
+		// messageText for intent classifier — rctx.content is the normalized
+		// text seen by downstream pipeline; pass through here for classifier.
+		decision, matched, err := c.RouteResolver().ResolveDecision(ctx, c.InstanceID(), peerID, rctx.content, peerKind, mediaKind, rctx.wasMentioned)
+		switch {
+		case err != nil:
+			slog.Warn("telegram: route resolver error, falling back to default agent",
+				"instance_id", c.InstanceID(), "err", err)
+		case matched:
+			targetAgentID = decision.TargetID.String()
+			routeToolAllow = decision.ToolAllow
+			targetKind = decision.TargetKind
+			slog.Debug("telegram: routed via channel_agent_routes",
+				"agent_id", targetAgentID, "target_kind", targetKind, "peer_kind", peerKind,
+				"media_kind", mediaKind, "mention_matched", rctx.wasMentioned,
+				"tool_allow_size", len(decision.ToolAllow),
+			)
 		}
 	}
+	// Topic-tools precedence: if both the route and topic config narrow tools,
+	// intersect (most restrictive wins). Route alone overrides topic when set.
+	toolAllowFinal := intersectToolAllow(routeToolAllow, rctx.topicCfg.tools)
 
 	// Collect contact for processed messages (DM + group-mentioned).
 	if cc := c.ContactCollector(); cc != nil {
@@ -702,8 +735,9 @@ func (c *Channel) processResolvedMessage(ctx context.Context, rctx resolvedMessa
 		PeerKind:     peerKind,
 		UserID:       rctx.userID,
 		AgentID:      targetAgentID,
+		TargetKind:   targetKind,
 		HistoryLimit: c.HistoryLimit(),
-		ToolAllow:    rctx.topicCfg.tools,
+		ToolAllow:    toolAllowFinal,
 		TenantID:     c.TenantID(),
 		Metadata:     metadata,
 	})

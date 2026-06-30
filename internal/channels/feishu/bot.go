@@ -7,10 +7,14 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/nextlevelbuilder/goclaw/internal/audio"
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
 	"github.com/nextlevelbuilder/goclaw/internal/channels/media"
+	"github.com/nextlevelbuilder/goclaw/internal/channels/routing"
+	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
 
 // messageContext holds parsed information from a Feishu message event.
@@ -322,17 +326,39 @@ func (c *Channel) handleMessageEvent(ctx context.Context, event *MessageEvent) {
 		}
 	}
 
-	// 12. Voice agent routing
+	// 12. Multi-agent routing via channel_agent_routes. Legacy VoiceAgentID
+	// config is auto-migrated into a media_type=voice route row at startup.
+	// On group chats, MentionedBot drives the mention_required gate.
 	targetAgentID := c.AgentID()
-	if c.cfg.VoiceAgentID != "" {
+	targetKind := store.RouteTargetAgent
+	var routeToolAllow []string
+	if c.RouteResolver() != nil && c.InstanceID() != uuid.Nil {
+		mediaTypes := make([]string, 0, len(mediaList))
 		for _, m := range mediaList {
-			if m.Type == media.TypeAudio || m.Type == media.TypeVoice {
-				targetAgentID = c.cfg.VoiceAgentID
-				slog.Debug("feishu: routing voice inbound to speaking agent",
-					"agent_id", targetAgentID, "media_type", m.Type,
-				)
-				break
-			}
+			mediaTypes = append(mediaTypes, m.Type)
+		}
+		mediaKind := routing.DeriveMediaKindFromMediaInfoTypes(mediaTypes)
+		mentionMatched := mc.MentionedBot
+		// peerID for sticky: chatID alone for DM, composite for group so each
+		// user gets their own affinity binding.
+		peerID := mc.ChatID
+		if mc.ChatID != mc.SenderID {
+			peerID = mc.ChatID + ":" + mc.SenderID
+		}
+		decision, matched, err := c.RouteResolver().ResolveDecision(ctx, c.InstanceID(), peerID, mc.Content, peerKind, mediaKind, mentionMatched)
+		switch {
+		case err != nil:
+			slog.Warn("feishu: route resolver error, falling back to default agent",
+				"instance_id", c.InstanceID(), "err", err)
+		case matched:
+			targetAgentID = decision.TargetID.String()
+			routeToolAllow = decision.ToolAllow
+			targetKind = decision.TargetKind
+			slog.Debug("feishu: routed via channel_agent_routes",
+				"agent_id", targetAgentID, "target_kind", targetKind, "peer_kind", peerKind,
+				"media_kind", mediaKind, "mention_matched", mentionMatched,
+				"tool_allow_size", len(decision.ToolAllow),
+			)
 		}
 	}
 
@@ -349,7 +375,9 @@ func (c *Channel) handleMessageEvent(ctx context.Context, event *MessageEvent) {
 		PeerKind:     peerKind,
 		UserID:       userID,
 		AgentID:      targetAgentID,
+		TargetKind:   targetKind,
 		HistoryLimit: c.HistoryLimit(),
+		ToolAllow:    routeToolAllow,
 		TenantID:     c.TenantID(),
 		Metadata:     metadata,
 	})
