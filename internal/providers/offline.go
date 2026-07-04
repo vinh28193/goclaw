@@ -87,16 +87,54 @@ func (p *OfflineProvider) ChatStream(ctx context.Context, req ChatRequest, onChu
 // classify (fresh user message) and compose (our tool results came back).
 func (p *OfflineProvider) Chat(_ context.Context, req ChatRequest) (*ChatResponse, error) {
 	if results, intentTag, ok := trailingOfflineToolResults(req.Messages); ok {
+		if intentTag == "" {
+			// The agent loop rewrites tool-call IDs (uniquifyToolCallIDs), so the
+			// intent tag encoded in our IDs is usually lost by the time results
+			// come back. Re-classify the originating user message — deterministic,
+			// so it recovers the same intent.
+			intentTag = p.reclassifyIntentTag(req)
+		}
 		return p.compose(req, results, intentTag), nil
 	}
 	return p.classify(req), nil
 }
 
+// reclassifyIntentTag re-runs the classifier to recover the intent for
+// compose() when the tool-call ID tag was rewritten by the agent loop.
+func (p *OfflineProvider) reclassifyIntentTag(req ChatRequest) string {
+	decision := msgintent.Classify(msgintent.MessageSignals{
+		Text:         lastUserContent(req.Messages),
+		PeerKind:     p.peerKind(req),
+		WasMentioned: p.wasMentioned(req),
+	}, p.settings.IntentConfig)
+	switch decision.Intent {
+	case msgintent.IntentShortlinkOffer, msgintent.IntentCommissionLookup:
+		return string(decision.Intent)
+	}
+	return ""
+}
+
+// peerKind reads the transport hint; absent (HTTP chat-completions, tests)
+// means a 1-1 conversation — treat as direct so questions get a reply
+// instead of group-chatter silence.
+func (p *OfflineProvider) peerKind(req ChatRequest) string {
+	peerKind, _ := req.Options[OptPeerKind].(string)
+	if peerKind == "" {
+		return "direct"
+	}
+	return peerKind
+}
+
+func (p *OfflineProvider) wasMentioned(req ChatRequest) bool {
+	wasMentioned, _ := req.Options[OptWasMentioned].(bool)
+	return wasMentioned
+}
+
 // classify runs the deterministic intent matrix on the last user message.
 func (p *OfflineProvider) classify(req ChatRequest) *ChatResponse {
 	text := lastUserContent(req.Messages)
-	peerKind, _ := req.Options[OptPeerKind].(string)
-	wasMentioned, _ := req.Options[OptWasMentioned].(bool)
+	peerKind := p.peerKind(req)
+	wasMentioned := p.wasMentioned(req)
 
 	decision := msgintent.Classify(msgintent.MessageSignals{
 		Text:         text,
@@ -192,7 +230,9 @@ func (p *OfflineProvider) compose(req ChatRequest, results map[string]Message, i
 			map[string]string{"name": com.ProductName}))
 	}
 	if com.OK && com.Rate > 0 {
-		rate := strconv.FormatFloat(com.Rate*100, 'f', -1, 64)
+		// Round to 2 decimals then trim trailing zeros — avoids float64 artifacts
+		// like 0.07*100 = 7.000000000000001 leaking into the reply.
+		rate := strings.TrimRight(strings.TrimRight(strconv.FormatFloat(com.Rate*100, 'f', 2, 64), "0"), ".")
 		lines = append(lines, msgintent.RenderKey(i18n.MsgIntentRichRate, locale,
 			map[string]string{"rate": rate}))
 	} else if intentTag == string(msgintent.IntentCommissionLookup) {
@@ -230,11 +270,10 @@ func trailingOfflineToolResults(msgs []Message) (map[string]Message, string, boo
 	results := map[string]Message{}
 	intentTag := ""
 	for _, tc := range assistant.ToolCalls {
-		rest, ok := strings.CutPrefix(tc.ID, offlineCallID)
-		if !ok {
+		kind, tag := offlineCallKind(tc)
+		if kind == "" {
 			return nil, "", false // not our calls (mixed history — classify fresh)
 		}
-		kind, tag, _ := strings.Cut(rest, "_")
 		if msg, ok := byCallID[tc.ID]; ok {
 			results[kind] = msg
 		}
@@ -260,6 +299,29 @@ func lastUserContent(msgs []Message) string {
 
 // findToolBySuffix locates a registered tool whose name ends with suffix
 // (MCP bridge names are "{prefix}__{tool}"; native tools match exactly).
+// offlineCallKind identifies whether a historical tool call belongs to this
+// provider and which slot it fills. Primary signal is the offline_call_ ID
+// prefix (carries the intent tag); fallback is the tool NAME, because the
+// agent loop rewrites tool-call IDs (uniquifyToolCallIDs) before execution,
+// destroying the prefix on the round-trip.
+func offlineCallKind(tc ToolCall) (kind, tag string) {
+	if rest, ok := strings.CutPrefix(tc.ID, offlineCallID); ok {
+		k, t, _ := strings.Cut(rest, "_")
+		return k, t
+	}
+	if toolNameMatches(tc.Name, "generate_shortlink") {
+		return "shortlink", ""
+	}
+	if toolNameMatches(tc.Name, "get_commission_for_url") {
+		return "commission", ""
+	}
+	return "", ""
+}
+
+func toolNameMatches(name, suffix string) bool {
+	return name == suffix || strings.HasSuffix(name, "__"+suffix)
+}
+
 func findToolBySuffix(tools []ToolDefinition, suffix string) string {
 	for _, td := range tools {
 		if td.Function == nil {

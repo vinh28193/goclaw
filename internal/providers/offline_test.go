@@ -197,13 +197,14 @@ func TestOfflineChatStreamEmitsSingleChunk(t *testing.T) {
 }
 
 func TestOfflineMixedHistoryClassifiesFresh(t *testing.T) {
-	// Trailing tool results from a DIFFERENT (LLM) agent's calls must not
-	// trigger compose — IDs lack the offline prefix.
+	// Trailing tool results for UNRELATED tools (an LLM agent's web_search etc.)
+	// must not trigger compose — neither the offline ID prefix nor a known
+	// shortlink/commission tool name matches.
 	p := NewOfflineProvider("offline", ParseOfflineSettings(nil))
 	req := ChatRequest{
 		Messages: []Message{
 			{Role: "user", Content: "https://shopee.vn/x"},
-			{Role: "assistant", ToolCalls: []ToolCall{{ID: "call_llm_1", Name: testShortlinkTool}}},
+			{Role: "assistant", ToolCalls: []ToolCall{{ID: "call_llm_1", Name: "web_search"}}},
 			{Role: "tool", ToolCallID: "call_llm_1", Content: `{"ok":true}`},
 		},
 		Tools:   offlineTestTools(),
@@ -211,6 +212,40 @@ func TestOfflineMixedHistoryClassifiesFresh(t *testing.T) {
 	}
 	resp, _ := p.Chat(context.Background(), req)
 	if len(resp.ToolCalls) == 0 {
-		t.Fatalf("foreign tool history must re-classify (emit own calls), got %+v", resp)
+		t.Fatalf("unrelated tool history must re-classify (emit own calls), got %+v", resp)
+	}
+}
+
+func TestOfflineComposesAfterLoopRewritesCallIDs(t *testing.T) {
+	// The agent loop rewrites tool-call IDs (uniquifyToolCallIDs) — compose must
+	// still fire by matching tool NAMES, and the intent tag is recovered by
+	// re-classifying the originating user message.
+	p := NewOfflineProvider("offline", ParseOfflineSettings(nil))
+	req := ChatRequest{
+		Messages: []Message{
+			{Role: "user", Content: "hoa hồng link này bao nhiêu https://shopee.vn/x-i.1.2"},
+			{Role: "assistant", ToolCalls: []ToolCall{
+				{ID: "call_abc123rewritten", Name: testShortlinkTool},
+				{ID: "call_def456rewritten", Name: testCommissionTool},
+			}},
+			{Role: "tool", ToolCallID: "call_abc123rewritten", Content: `{"ok":true,"shortlink_url":"https://aff.x/s/abc"}`},
+			{Role: "tool", ToolCallID: "call_def456rewritten", Content: `{"ok":false}`, IsError: true},
+		},
+		Tools:   offlineTestTools(),
+		Options: map[string]any{OptPeerKind: "direct", OptSessionKey: "s"},
+	}
+	resp, err := p.Chat(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if len(resp.ToolCalls) != 0 {
+		t.Fatalf("must compose, not re-emit tool calls: %+v", resp.ToolCalls)
+	}
+	if !strings.Contains(resp.Content, "https://aff.x/s/abc") {
+		t.Fatalf("reply must contain shortlink, got: %q", resp.Content)
+	}
+	// commission_lookup intent recovered via re-classification → a 💵 line renders
+	if !strings.Contains(resp.Content, "💵") {
+		t.Fatalf("commission_lookup must render a rate line (missing-info), got: %q", resp.Content)
 	}
 }
