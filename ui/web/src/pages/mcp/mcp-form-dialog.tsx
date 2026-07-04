@@ -66,6 +66,7 @@ export function MCPFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
       timeout: 60,
       enabled: true,
       requireUserCreds: false,
+      injectIdentity: false,
       toolHintsGlobal: "",
       toolHintsTools: {},
     },

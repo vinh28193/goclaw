@@ -12,6 +12,7 @@ import (
 
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
+	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
 // stubAgent is a minimal Agent implementation for router tests.
@@ -29,6 +30,9 @@ func (s *stubAgent) IsRunning() bool                                     { retur
 func (s *stubAgent) Model() string                                       { return "test-model" }
 func (s *stubAgent) ProviderName() string                                { return "test" }
 func (s *stubAgent) Provider() providers.Provider                        { return nil }
+func (s *stubAgent) CallTool(_ context.Context, _ string, _ map[string]any) (*tools.Result, bool) {
+	return nil, false
+}
 
 // stubResolver builds a ResolverFunc that returns a stubAgent with a
 // predetermined ID. If idByInput is set, the returned agent's ID is derived

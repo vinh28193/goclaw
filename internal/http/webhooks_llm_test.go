@@ -16,6 +16,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 	"github.com/nextlevelbuilder/goclaw/internal/scheduler"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
+	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
 // ---- stub: agent.Agent ----
@@ -28,22 +29,25 @@ type stubLLMAgent struct {
 	runFn   func(ctx context.Context, req agent.RunRequest) (*agent.RunResult, error)
 }
 
-func (a *stubLLMAgent) ID() string            { return a.id }
-func (a *stubLLMAgent) UUID() uuid.UUID        { return a.agentID }
+func (a *stubLLMAgent) ID() string                   { return a.id }
+func (a *stubLLMAgent) UUID() uuid.UUID              { return a.agentID }
 func (a *stubLLMAgent) OtherConfig() json.RawMessage { return nil }
 func (a *stubLLMAgent) Run(ctx context.Context, req agent.RunRequest) (*agent.RunResult, error) {
 	return a.runFn(ctx, req)
 }
-func (a *stubLLMAgent) IsRunning() bool            { return false }
-func (a *stubLLMAgent) Model() string               { return "test-model" }
-func (a *stubLLMAgent) ProviderName() string        { return "test" }
+func (a *stubLLMAgent) IsRunning() bool              { return false }
+func (a *stubLLMAgent) Model() string                { return "test-model" }
+func (a *stubLLMAgent) ProviderName() string         { return "test" }
 func (a *stubLLMAgent) Provider() providers.Provider { return nil }
+func (a *stubLLMAgent) CallTool(_ context.Context, _ string, _ map[string]any) (*tools.Result, bool) {
+	return nil, false
+}
 
 // ---- stub: store.WebhookCallStore for LLM tests ----
 
 // llmCallStore captures Create calls for assertion.
 type llmCallStore struct {
-	created []*store.WebhookCallData
+	created   []*store.WebhookCallData
 	createErr error
 }
 

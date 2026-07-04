@@ -9,6 +9,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/agent"
 	"github.com/nextlevelbuilder/goclaw/internal/channels"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
+	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
 // ---------------------------------------------------------------------------
@@ -22,8 +23,8 @@ type stubAgentForGate struct {
 	model    string
 }
 
-func (s *stubAgentForGate) ID() string { return "stub" }
-func (s *stubAgentForGate) UUID() uuid.UUID { return uuid.Nil }
+func (s *stubAgentForGate) ID() string                   { return "stub" }
+func (s *stubAgentForGate) UUID() uuid.UUID              { return uuid.Nil }
 func (s *stubAgentForGate) OtherConfig() json.RawMessage { return nil }
 func (s *stubAgentForGate) Run(_ context.Context, _ agent.RunRequest) (*agent.RunResult, error) {
 	return nil, nil
@@ -32,6 +33,9 @@ func (s *stubAgentForGate) IsRunning() bool              { return false }
 func (s *stubAgentForGate) Model() string                { return s.model }
 func (s *stubAgentForGate) ProviderName() string         { return "stub" }
 func (s *stubAgentForGate) Provider() providers.Provider { return s.provider }
+func (s *stubAgentForGate) CallTool(_ context.Context, _ string, _ map[string]any) (*tools.Result, bool) {
+	return nil, false
+}
 
 // gateStubProvider is a minimal providers.Provider that records Chat calls.
 type gateStubProvider struct {

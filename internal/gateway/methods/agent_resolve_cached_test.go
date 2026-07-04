@@ -11,6 +11,7 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/agent"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
+	"github.com/nextlevelbuilder/goclaw/internal/tools"
 )
 
 // errSentinelMiss is a sentinel error used to verify DB fallback in cache-miss
@@ -85,9 +86,9 @@ type cacheHitStubAgent struct {
 	uid uuid.UUID
 }
 
-func (s *cacheHitStubAgent) ID() string                                          { return s.id }
-func (s *cacheHitStubAgent) UUID() uuid.UUID                                     { return s.uid }
-func (s *cacheHitStubAgent) OtherConfig() json.RawMessage                        { return nil }
+func (s *cacheHitStubAgent) ID() string                   { return s.id }
+func (s *cacheHitStubAgent) UUID() uuid.UUID              { return s.uid }
+func (s *cacheHitStubAgent) OtherConfig() json.RawMessage { return nil }
 func (s *cacheHitStubAgent) Run(context.Context, agent.RunRequest) (*agent.RunResult, error) {
 	return nil, nil
 }
@@ -95,6 +96,9 @@ func (s *cacheHitStubAgent) IsRunning() bool              { return false }
 func (s *cacheHitStubAgent) Model() string                { return "test-model" }
 func (s *cacheHitStubAgent) ProviderName() string         { return "test" }
 func (s *cacheHitStubAgent) Provider() providers.Provider { return nil }
+func (s *cacheHitStubAgent) CallTool(_ context.Context, _ string, _ map[string]any) (*tools.Result, bool) {
+	return nil, false
+}
 
 // TestResolveAgentUUIDCached_CacheHitSkipsDBPath pins the fast path: when the
 // caller passes an agent_key AND the Loop is cached in the router AND the

@@ -14,7 +14,9 @@ export const mcpFormSchema = z.object({
   enabled: z.boolean(),
   requireUserCreds: z.boolean(),
   // Inject sender identity (sender_id, sender_name, chat_id, chat_type, channel) into every tool call.
-  injectIdentity: z.boolean().optional().default(false),
+  // Plain boolean (no .optional().default()) — zod input/output type divergence
+  // breaks the react-hook-form Resolver generics; the form supplies the default.
+  injectIdentity: z.boolean(),
   // Admin-authored description hints appended to MCP tool descriptions so the
   // LLM sees server-specific quirks. Persisted under settings.tool_hints.
   toolHintsGlobal: z.string(),
