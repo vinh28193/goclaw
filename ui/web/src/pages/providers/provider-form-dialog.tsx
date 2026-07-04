@@ -70,6 +70,8 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
   const isOAuth = providerType === "chatgpt_oauth";
   const isCLI = providerType === "claude_cli";
   const isACP = providerType === "acp";
+  // Offline agent provider is rule-based — no API base/key to configure.
+  const isOffline = providerType === "offline";
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -223,7 +225,7 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
                 />
               )}
 
-              {!isCLI && !isACP && (
+              {!isCLI && !isACP && !isOffline && (
                 <ProviderStandardFormFields
                   register={register}
                   errors={errors}
@@ -232,7 +234,7 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
                 />
               )}
 
-              {(isCLI || isACP) && (
+              {(isCLI || isACP || isOffline) && (
                 <>
                   <div className="flex items-center justify-between">
                     <Label htmlFor="enabled">{t("form.enabled")}</Label>

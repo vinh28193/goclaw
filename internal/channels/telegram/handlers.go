@@ -472,7 +472,7 @@ func (c *Channel) processResolvedMessage(ctx context.Context, rctx resolvedMessa
 
 	var mediaFiles []bus.MediaFile
 	if len(mediaList) > 0 {
-		var extraContent string
+		var extraContent strings.Builder
 		for i := range mediaList {
 			m := &mediaList[i]
 			switch m.Type {
@@ -492,7 +492,7 @@ func (c *Channel) processResolvedMessage(ctx context.Context, rctx resolvedMessa
 					if err != nil {
 						slog.Warn("document extraction failed", "file", m.FileName, "error", err)
 					} else if docContent != "" {
-						extraContent += "\n\n" + docContent
+						extraContent.WriteString("\n\n" + docContent)
 					}
 				}
 			case "video", "animation":
@@ -519,8 +519,8 @@ func (c *Channel) processResolvedMessage(ctx context.Context, rctx resolvedMessa
 				content = fullTags
 			}
 		}
-		if extraContent != "" {
-			content += extraContent
+		if extraContent.String() != "" {
+			content += extraContent.String()
 		}
 	}
 
@@ -628,6 +628,9 @@ func (c *Channel) processResolvedMessage(ctx context.Context, rctx resolvedMessa
 		"first_name":       user.FirstName,
 		"is_group":         fmt.Sprintf("%t", rctx.isGroup),
 		"local_key":        rctx.localKey,
+		// Mention signal for the deterministic intent classifier (msgintent).
+		// Telegram folds reply-to-bot into wasMentioned upstream (handlers.go:298).
+		"was_mentioned": fmt.Sprintf("%t", rctx.wasMentioned),
 	}
 	// When this publish coalesces multiple platform messages (album members),
 	// seed every sibling MessageID into merged_message_ids so the consumer

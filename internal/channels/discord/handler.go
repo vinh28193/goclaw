@@ -295,6 +295,9 @@ func (c *Channel) handleMessage(_ *discordgo.Session, m *discordgo.MessageCreate
 		"channel_id":      channelID,
 		"is_dm":           fmt.Sprintf("%t", isDM),
 		"placeholder_key": m.ID, // keyed by inbound message ID for placeholder lookup
+		// Mention signal for the deterministic intent classifier (msgintent) —
+		// `mentioned` already folds in reply-to-bot (ReferencedMessage check above).
+		"was_mentioned": fmt.Sprintf("%t", mentioned),
 	}
 	if !isDM {
 		if title := c.resolveCachedChannelTitle(channelID); title != "" {

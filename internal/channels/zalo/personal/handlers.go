@@ -96,9 +96,12 @@ func (c *Channel) handleGroupMessage(msg protocol.GroupMessage) {
 		senderName = senderID
 	}
 
+	// Mention signal — computed unconditionally so the deterministic intent
+	// classifier (msgintent) sees it even when mention gating is off.
+	wasMentioned := c.checkBotMentioned(msg.Data.Mentions)
+
 	// Step 2: @mention gating — record non-mentioned messages in history and return.
 	if c.RequireMention() {
-		wasMentioned := c.checkBotMentioned(msg.Data.Mentions)
 		if !wasMentioned {
 			c.GroupHistory().Record(threadID, channels.HistoryEntry{
 				Sender:    senderName,
@@ -148,10 +151,11 @@ func (c *Channel) handleGroupMessage(msg protocol.GroupMessage) {
 	}
 
 	metadata := map[string]string{
-		"message_id":   msg.Data.MsgID,
-		"platform":     channels.TypeZaloPersonal,
-		"group_id":     threadID,
-		"display_name": channels.SanitizeDisplayName(senderName),
+		"message_id":    msg.Data.MsgID,
+		"platform":      channels.TypeZaloPersonal,
+		"group_id":      threadID,
+		"display_name":  channels.SanitizeDisplayName(senderName),
+		"was_mentioned": fmt.Sprintf("%t", wasMentioned),
 	}
 	c.HandleMessage(senderID, threadID, finalContent, allMedia, metadata, "group")
 

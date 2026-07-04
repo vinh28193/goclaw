@@ -364,5 +364,35 @@ func init() {
 		MsgPackagesUpdatesReasonLocked:             "Package database is locked",
 		MsgPackagesUpdatesReasonDiskFull:           "Disk full",
 		MsgPackagesUpdatesReasonHelperUnavailable:  "Privileged helper unavailable",
+
+		// Deterministic message-intent reply templates ({url}/{rate}/{source}
+		// substituted by msgintent/templates.go — NOT fmt verbs)
+		MsgIntentShortlinkHumble1:   "May I share a shortened link: {url}",
+		MsgIntentShortlinkHumble2:   "Here's a shortened link for you: {url}",
+		MsgIntentShortlinkHumble3:   "Shortened the link for you: {url}",
+		MsgIntentShortlinkCasual1:   "Spotted a link 👋 here's the short version: {url}",
+		MsgIntentShortlinkCasual2:   "Short link coming up: {url} ✨",
+		MsgIntentShortlinkCasual3:   "All shortened: {url}",
+		MsgIntentShortlinkBusiness1: "Affiliate link: {url}",
+		MsgIntentShortlinkBusiness2: "Shortened link: {url}",
+		MsgIntentShortlinkBusiness3: "Shortlink: {url}",
+		MsgIntentShortlinkMinimal1:  "🔗 {url}",
+
+		MsgIntentCommissionHumble1:   "The commission for this product is about {rate}%",
+		MsgIntentCommissionHumble2:   "I found a commission rate of about {rate}%",
+		MsgIntentCommissionHumble3:   "The current commission rate is {rate}%",
+		MsgIntentCommissionCasual1:   "Commission on this one is {rate}% ✨",
+		MsgIntentCommissionCasual2:   "Checked it: {rate}% 👋",
+		MsgIntentCommissionBusiness1: "Commission: {rate}% (source: {source})",
+		MsgIntentCommissionMinimal1:  "{rate}%",
+
+		MsgIntentDecline1:  "That's outside what I can help with 🙏 I can only assist with affiliate links and commissions",
+		MsgIntentDecline2:  "I'll pass on that one — ask me about shortlinks or commissions and I'm right on it",
+		MsgIntentDecline3:  "I'm not the right one for that — I specialize in affiliate topics 😊",
+		MsgIntentDegraded1: "The system is a bit busy right now — please resend the link in 1-2 minutes 🙏",
+
+		MsgIntentRichProduct:     "📦 {name}",
+		MsgIntentRichRate:        "💵 Commission {rate}%",
+		MsgIntentRichRateMissing: "💵 Commission info not available yet",
 	})
 }

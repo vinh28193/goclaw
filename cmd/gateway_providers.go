@@ -301,6 +301,13 @@ func registerProvidersFromDB(registry *providers.Registry, provStore store.Provi
 			slog.Info("registered provider from DB", "name", p.Name)
 			continue
 		}
+		// Offline (rule-based, zero LLM) needs no API key — handle before the key guard.
+		if p.ProviderType == store.ProviderOffline {
+			registry.RegisterForTenant(p.TenantID,
+				providers.NewOfflineProvider(p.Name, providers.ParseOfflineSettings(p.Settings)))
+			slog.Info("registered provider from DB", "name", p.Name, "type", "offline")
+			continue
+		}
 		// Vertex supports ADC (empty api_key) — handle before the generic key guard.
 		if p.ProviderType == store.ProviderVertex {
 			vsettings := store.ParseVertexProviderSettings(p.Settings)

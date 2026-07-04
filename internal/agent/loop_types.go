@@ -633,6 +633,7 @@ type RunRequest struct {
 	ChatTitle          string             // group chat display name (e.g. Telegram group title)
 	ChatID             string             // source chat ID
 	PeerKind           string             // "direct" or "group" (for session key building and tool context)
+	WasMentioned       bool               // bot was @mentioned / replied-to (group signal for the offline provider)
 	RunID              string             // unique run identifier
 	UserID             string             // external user ID (TEXT, free-form) for multi-tenant scoping
 	SenderID           string             // original individual sender ID (preserved in group chats for permission checks)

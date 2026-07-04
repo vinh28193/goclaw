@@ -511,6 +511,7 @@ func processNormalMessage(
 		ChatID:            msg.ChatID,
 		WorkspaceChatID:   msg.ChatID,
 		PeerKind:          peerKind,
+		WasMentioned:      msg.Metadata["was_mentioned"] == "true",
 		LocalKey:          msg.Metadata["local_key"],
 		UserID:            userID,
 		SenderID:          effectiveSenderID,

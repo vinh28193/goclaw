@@ -256,6 +256,12 @@ func (h *ProvidersHandler) registerInMemory(p *store.LLMProviderData) providerRu
 		h.providerReg.RegisterForTenant(p.TenantID, providers.NewOpenAIProvider(p.Name, "ollama", config.DockerLocalhost(host), "llama3.3"))
 		return providerRuntimeRegistered
 	}
+	// Offline (rule-based, zero LLM) needs no API key — handle before the key guard.
+	if p.ProviderType == store.ProviderOffline {
+		h.providerReg.RegisterForTenant(p.TenantID,
+			providers.NewOfflineProvider(p.Name, providers.ParseOfflineSettings(p.Settings)))
+		return providerRuntimeRegistered
+	}
 	// Vertex supports ADC (empty api_key) — handle before the generic key guard.
 	if p.ProviderType == store.ProviderVertex {
 		vsettings := store.ParseVertexProviderSettings(p.Settings)

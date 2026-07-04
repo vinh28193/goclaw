@@ -39,12 +39,13 @@ internal/
 ├── knowledgegraph/           Knowledge graph storage and traversal
 ├── mcp/                      Model Context Protocol bridge/server
 ├── media/                    Media handling utilities
+├── msgintent/                Deterministic message-intent classifier + reply templates (used by the offline provider — see docs/offline-agent-provider.md)
 ├── memory/                   Memory system (pgvector)
 ├── oauth/                    OAuth authentication
 ├── orchestration/            Orchestration primitives: BatchQueue[T] generic, ChildResult, media conversion (v3)
 ├── permissions/              RBAC (admin/operator/viewer)
 ├── pipeline/                 8-stage agent pipeline (context→history→prompt→think→act→observe→memory→summarize)
-├── providers/                LLM providers: Anthropic (native HTTP+SSE), OpenAI-compat (HTTP+SSE), DashScope (Alibaba Qwen), Claude CLI (stdio+MCP bridge), ACP (Anthropic Console Proxy), Codex (OpenAI), Vertex AI (GCP OAuth2 + OpenAI-compat)
+├── providers/                LLM providers: Anthropic (native HTTP+SSE), OpenAI-compat (HTTP+SSE), DashScope (Alibaba Qwen), Claude CLI (stdio+MCP bridge), ACP (Anthropic Console Proxy), Codex (OpenAI), Vertex AI (GCP OAuth2 + OpenAI-compat), Offline (rule-based, zero LLM — docs/offline-agent-provider.md)
 ├── providerresolve/          Provider adapter + model registry with forward-compat resolver
 ├── sandbox/                  Docker-based code execution sandbox
 ├── scheduler/                Lane-based concurrency (main/subagent/cron)

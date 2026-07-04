@@ -373,4 +373,35 @@ const (
 	MsgGitCredHostScopeInvalid         = "error.git_cred_host_scope_invalid"         // "host_scope %q is not a valid hostname"
 	MsgGitCredBlobMissingField         = "error.git_cred_blob_missing_field"         // "blob missing required field %q"
 	MsgGitCredUnsupportedCredType      = "error.git_cred_unsupported_cred_type"      // "credential_type %q is not supported"
+
+	// --- Deterministic message-intent reply templates (internal/msgintent) ---
+	// Pool pattern: msgintent.{intent}.{tone}.{n} — templates.go picks seeded-random.
+	// Placeholders {url} {rate} {source} are substituted by msgintent/templates.go.
+	MsgIntentShortlinkHumble1    = "msgintent.shortlink.humble.1"
+	MsgIntentShortlinkHumble2    = "msgintent.shortlink.humble.2"
+	MsgIntentShortlinkHumble3    = "msgintent.shortlink.humble.3"
+	MsgIntentShortlinkCasual1    = "msgintent.shortlink.casual.1"
+	MsgIntentShortlinkCasual2    = "msgintent.shortlink.casual.2"
+	MsgIntentShortlinkCasual3    = "msgintent.shortlink.casual.3"
+	MsgIntentShortlinkBusiness1  = "msgintent.shortlink.business.1"
+	MsgIntentShortlinkBusiness2  = "msgintent.shortlink.business.2"
+	MsgIntentShortlinkBusiness3  = "msgintent.shortlink.business.3"
+	MsgIntentShortlinkMinimal1   = "msgintent.shortlink.minimal.1"
+	MsgIntentCommissionHumble1   = "msgintent.commission.humble.1"
+	MsgIntentCommissionHumble2   = "msgintent.commission.humble.2"
+	MsgIntentCommissionHumble3   = "msgintent.commission.humble.3"
+	MsgIntentCommissionCasual1   = "msgintent.commission.casual.1"
+	MsgIntentCommissionCasual2   = "msgintent.commission.casual.2"
+	MsgIntentCommissionBusiness1 = "msgintent.commission.business.1"
+	MsgIntentCommissionMinimal1  = "msgintent.commission.minimal.1"
+	MsgIntentDecline1            = "msgintent.decline.1"
+	MsgIntentDecline2            = "msgintent.decline.2"
+	MsgIntentDecline3            = "msgintent.decline.3"
+	MsgIntentDegraded1           = "msgintent.degraded.1"
+
+	// Rich reply block lines appended by the offline provider under the
+	// shortlink opener ({name}/{rate} substituted by msgintent/templates.go).
+	MsgIntentRichProduct     = "msgintent.rich.product"
+	MsgIntentRichRate        = "msgintent.rich.rate"
+	MsgIntentRichRateMissing = "msgintent.rich.rate_missing"
 )

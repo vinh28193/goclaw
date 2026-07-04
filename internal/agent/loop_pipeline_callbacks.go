@@ -322,6 +322,7 @@ func (l *Loop) makeCallLLM(req *RunRequest, emitRun func(AgentEvent)) func(ctx c
 		chatReq.Options[providers.OptChannel] = req.Channel
 		chatReq.Options[providers.OptChatID] = req.ChatID
 		chatReq.Options[providers.OptPeerKind] = req.PeerKind
+		chatReq.Options[providers.OptWasMentioned] = req.WasMentioned
 		chatReq.Options[providers.OptLocalKey] = req.LocalKey
 		chatReq.Options[providers.OptWorkspace] = tools.ToolWorkspaceFromCtx(ctx)
 		if tid := store.TenantIDFromContext(ctx); tid != uuid.Nil {

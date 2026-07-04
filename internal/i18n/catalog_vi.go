@@ -364,5 +364,35 @@ func init() {
 		MsgPackagesUpdatesReasonLocked:             "Cơ sở dữ liệu gói đang bị khóa",
 		MsgPackagesUpdatesReasonDiskFull:           "Đĩa đã đầy",
 		MsgPackagesUpdatesReasonHelperUnavailable:  "Dịch vụ đặc quyền không khả dụng",
+
+		// Deterministic message-intent reply templates ({url}/{rate}/{source}
+		// substituted by msgintent/templates.go — NOT fmt verbs)
+		MsgIntentShortlinkHumble1:   "Em xin phép rút gọn link nha ạ: {url}",
+		MsgIntentShortlinkHumble2:   "Rút gọn link giúp anh chị nè: {url}",
+		MsgIntentShortlinkHumble3:   "Em gửi link rút gọn ạ: {url}",
+		MsgIntentShortlinkCasual1:   "Em thấy link rồi ạ 👋 rút gọn nè: {url}",
+		MsgIntentShortlinkCasual2:   "Link gọn đây nha: {url} ✨",
+		MsgIntentShortlinkCasual3:   "Rút gọn xong rồi nè: {url}",
+		MsgIntentShortlinkBusiness1: "Link affiliate: {url}",
+		MsgIntentShortlinkBusiness2: "Link rút gọn: {url}",
+		MsgIntentShortlinkBusiness3: "Shortlink: {url}",
+		MsgIntentShortlinkMinimal1:  "🔗 {url}",
+
+		MsgIntentCommissionHumble1:   "Dạ commission sản phẩm này khoảng {rate}% ạ",
+		MsgIntentCommissionHumble2:   "Em check được hoa hồng khoảng {rate}% ạ",
+		MsgIntentCommissionHumble3:   "Dạ mức hoa hồng hiện tại là {rate}% ạ",
+		MsgIntentCommissionCasual1:   "Hoa hồng món này {rate}% nha ✨",
+		MsgIntentCommissionCasual2:   "Check xong nè: {rate}% 👋",
+		MsgIntentCommissionBusiness1: "Commission: {rate}% (nguồn: {source})",
+		MsgIntentCommissionMinimal1:  "{rate}%",
+
+		MsgIntentDecline1:  "Câu này ngoài phạm vi em hỗ trợ ạ 🙏 Em chỉ giúp được về link affiliate với hoa hồng thôi ạ",
+		MsgIntentDecline2:  "Em xin phép không trả lời phần này ạ, anh chị hỏi về shortlink/commission em hỗ trợ ngay nè",
+		MsgIntentDecline3:  "Dạ phần này em không rành ạ, em chuyên về affiliate thôi 😊",
+		MsgIntentDegraded1: "Dạ hệ thống đang bận xíu, anh chị gửi lại link sau 1-2 phút giúp em nha 🙏",
+
+		MsgIntentRichProduct:     "📦 {name}",
+		MsgIntentRichRate:        "💵 Hoa hồng {rate}%",
+		MsgIntentRichRateMissing: "💵 Hiện chưa có thông tin hoa hồng",
 	})
 }

@@ -83,8 +83,11 @@ func (c *Channel) handleIncomingMessage(evt *events.Message) {
 	if historyLimit == 0 {
 		historyLimit = channels.DefaultGroupHistoryLimit
 	}
+	// Mention signal — computed unconditionally so the deterministic intent
+	// classifier (msgintent) sees it even when mention gating is off.
+	wasMentioned := peerKind == "group" && c.isMentioned(evt)
 	if peerKind == "group" && c.config.RequireMention != nil && *c.config.RequireMention {
-		if !c.isMentioned(evt) {
+		if !wasMentioned {
 			// Not mentioned — record for context and skip.
 			senderLabel := evt.Info.PushName
 			if senderLabel == "" {
@@ -106,6 +109,8 @@ func (c *Channel) handleIncomingMessage(evt *events.Message) {
 
 	metadata := map[string]string{
 		"message_id": string(evt.Info.ID),
+		// Mention signal for the deterministic intent classifier (msgintent).
+		"was_mentioned": fmt.Sprintf("%t", wasMentioned),
 	}
 	if evt.Info.PushName != "" {
 		metadata["user_name"] = evt.Info.PushName

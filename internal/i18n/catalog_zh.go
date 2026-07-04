@@ -364,5 +364,35 @@ func init() {
 		MsgPackagesUpdatesReasonLocked:             "软件包数据库已锁定",
 		MsgPackagesUpdatesReasonDiskFull:           "磁盘已满",
 		MsgPackagesUpdatesReasonHelperUnavailable:  "特权助手不可用",
+
+		// Deterministic message-intent reply templates ({url}/{rate}/{source}
+		// substituted by msgintent/templates.go — NOT fmt verbs)
+		MsgIntentShortlinkHumble1:   "为您缩短了链接：{url}",
+		MsgIntentShortlinkHumble2:   "这是缩短后的链接：{url}",
+		MsgIntentShortlinkHumble3:   "已为您生成短链接：{url}",
+		MsgIntentShortlinkCasual1:   "看到链接啦 👋 短链接来咯：{url}",
+		MsgIntentShortlinkCasual2:   "短链接在这里：{url} ✨",
+		MsgIntentShortlinkCasual3:   "缩短完成：{url}",
+		MsgIntentShortlinkBusiness1: "联盟链接：{url}",
+		MsgIntentShortlinkBusiness2: "短链接：{url}",
+		MsgIntentShortlinkBusiness3: "Shortlink：{url}",
+		MsgIntentShortlinkMinimal1:  "🔗 {url}",
+
+		MsgIntentCommissionHumble1:   "该商品的佣金约为 {rate}%",
+		MsgIntentCommissionHumble2:   "查到的佣金比例约为 {rate}%",
+		MsgIntentCommissionHumble3:   "当前佣金比例为 {rate}%",
+		MsgIntentCommissionCasual1:   "这个的佣金是 {rate}% ✨",
+		MsgIntentCommissionCasual2:   "查好了：{rate}% 👋",
+		MsgIntentCommissionBusiness1: "佣金：{rate}%（来源：{source}）",
+		MsgIntentCommissionMinimal1:  "{rate}%",
+
+		MsgIntentDecline1:  "这个问题超出了我的服务范围 🙏 我只能帮您处理联盟链接和佣金相关的问题",
+		MsgIntentDecline2:  "这部分我就不回答啦，关于短链接或佣金的问题我随时为您服务",
+		MsgIntentDecline3:  "这个我不太懂，我专注于联盟营销领域 😊",
+		MsgIntentDegraded1: "系统现在有点忙，请1-2分钟后重新发送链接 🙏",
+
+		MsgIntentRichProduct:     "📦 {name}",
+		MsgIntentRichRate:        "💵 佣金 {rate}%",
+		MsgIntentRichRateMissing: "💵 暂无佣金信息",
 	})
 }
