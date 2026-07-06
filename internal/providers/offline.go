@@ -30,29 +30,9 @@ const OptWasMentioned = "was_mentioned"
 // recognize its own calls when the tool results come back next iteration.
 const offlineCallID = "offline_call_"
 
-// OfflineSettings is stored in llm_providers.settings JSONB.
-type OfflineSettings struct {
-	Tone         string                      `json:"tone"`   // casual|humble|business|minimal (default humble)
-	Locale       string                      `json:"locale"` // en|vi|zh (default vi)
-	IntentConfig *msgintent.KeywordOverrides `json:"intent_config,omitempty"`
-}
-
-// ParseOfflineSettings extracts offline provider settings with defaults.
-func ParseOfflineSettings(raw json.RawMessage) OfflineSettings {
-	var s OfflineSettings
-	if len(raw) > 0 {
-		_ = json.Unmarshal(raw, &s) // zero-value fallback on malformed settings
-	}
-	if !msgintent.ValidTone(s.Tone) {
-		s.Tone = string(msgintent.ToneHumble)
-	}
-	if s.Locale == "" {
-		s.Locale = "vi"
-	}
-	return s
-}
-
 // OfflineProvider implements Provider without any upstream API.
+// Settings (tone, locale, reply_prefix, template overrides) live in
+// offline_settings.go.
 type OfflineProvider struct {
 	name     string
 	settings OfflineSettings
@@ -86,6 +66,7 @@ func (p *OfflineProvider) ChatStream(ctx context.Context, req ChatRequest, onChu
 // Chat is the rule engine. Two phases inferred from message history:
 // classify (fresh user message) and compose (our tool results came back).
 func (p *OfflineProvider) Chat(_ context.Context, req ChatRequest) (*ChatResponse, error) {
+	var resp *ChatResponse
 	if results, intentTag, ok := trailingOfflineToolResults(req.Messages); ok {
 		if intentTag == "" {
 			// The agent loop rewrites tool-call IDs (uniquifyToolCallIDs), so the
@@ -94,9 +75,14 @@ func (p *OfflineProvider) Chat(_ context.Context, req ChatRequest) (*ChatRespons
 			// so it recovers the same intent.
 			intentTag = p.reclassifyIntentTag(req)
 		}
-		return p.compose(req, results, intentTag), nil
+		resp = p.compose(req, results, intentTag)
+	} else {
+		resp = p.classify(req)
 	}
-	return p.classify(req), nil
+	// Single application point for the operator prefix — NO_REPLY and
+	// tool-call turns (empty content) pass through unchanged.
+	resp.Content = p.settings.withPrefix(resp.Content)
+	return resp, nil
 }
 
 // reclassifyIntentTag re-runs the classifier to recover the intent for
@@ -149,8 +135,15 @@ func (p *OfflineProvider) classify(req ChatRequest) *ChatResponse {
 	case msgintent.IntentChatter:
 		return &ChatResponse{Content: "NO_REPLY", FinishReason: "stop"}
 	default: // off_scope_question, general, commission_broadcast
-		return &ChatResponse{Content: msgintent.RenderDecline(p.settings.Locale, seed), FinishReason: "stop"}
+		return &ChatResponse{Content: p.renderDecline(seed), FinishReason: "stop"}
 	}
+}
+
+// renderDecline returns the decline reply, honoring an operator override.
+func (p *OfflineProvider) renderDecline(seed uint64) string {
+	return p.settings.renderSlotRequired(SlotDecline, nil, seed, func() string {
+		return msgintent.RenderDecline(p.settings.Locale, seed)
+	})
 }
 
 // emitToolCalls asks the agent loop to execute the MCP tools. Tool names are
@@ -161,7 +154,7 @@ func (p *OfflineProvider) emitToolCalls(req ChatRequest, decision msgintent.Inte
 	if shortlinkTool == "" {
 		// Agent has no shortlink tool granted — nothing useful to do offline.
 		return &ChatResponse{
-			Content:      msgintent.RenderDecline(p.settings.Locale, p.seed(req, decision.MatchedURL)),
+			Content:      p.renderDecline(p.seed(req, decision.MatchedURL)),
 			FinishReason: "stop",
 		}
 	}
@@ -214,7 +207,10 @@ func (p *OfflineProvider) compose(req ChatRequest, results map[string]Message, i
 	}
 	if !sl.OK || sl.ShortlinkURL == "" {
 		// Business request we could not serve — apologize, never go silent.
-		return &ChatResponse{Content: msgintent.RenderDegraded(locale, seed), FinishReason: "stop"}
+		degraded := p.settings.renderSlotRequired(SlotDegraded, nil, seed, func() string {
+			return msgintent.RenderDegraded(locale, seed)
+		})
+		return &ChatResponse{Content: degraded, FinishReason: "stop"}
 	}
 
 	var com commissionEnvelope
@@ -223,21 +219,39 @@ func (p *OfflineProvider) compose(req ChatRequest, results map[string]Message, i
 	}
 
 	tone := msgintent.Tone(p.settings.Tone)
-	lines := []string{msgintent.Render(msgintent.IntentShortlinkOffer, tone, locale,
-		map[string]string{"url": sl.ShortlinkURL}, seed)}
+	opener := p.settings.renderSlotRequired(SlotOpener,
+		map[string]string{"url": sl.ShortlinkURL}, seed, func() string {
+			return msgintent.Render(msgintent.IntentShortlinkOffer, tone, locale,
+				map[string]string{"url": sl.ShortlinkURL}, seed)
+		})
+	lines := []string{opener}
+	appendLine := func(text string) {
+		// Rich-block lines are optional — an override rendering "" drops the line.
+		if text != "" {
+			lines = append(lines, text)
+		}
+	}
 	if com.OK && com.ProductName != "" {
-		lines = append(lines, msgintent.RenderKey(i18n.MsgIntentRichProduct, locale,
-			map[string]string{"name": com.ProductName}))
+		appendLine(p.settings.renderSlot(SlotProductLine,
+			map[string]string{"name": com.ProductName}, seed, func() string {
+				return msgintent.RenderKey(i18n.MsgIntentRichProduct, locale,
+					map[string]string{"name": com.ProductName})
+			}))
 	}
 	if com.OK && com.Rate > 0 {
 		// Round to 2 decimals then trim trailing zeros — avoids float64 artifacts
 		// like 0.07*100 = 7.000000000000001 leaking into the reply.
 		rate := strings.TrimRight(strings.TrimRight(strconv.FormatFloat(com.Rate*100, 'f', 2, 64), "0"), ".")
-		lines = append(lines, msgintent.RenderKey(i18n.MsgIntentRichRate, locale,
-			map[string]string{"rate": rate}))
+		appendLine(p.settings.renderSlot(SlotRateLine,
+			map[string]string{"rate": rate}, seed, func() string {
+				return msgintent.RenderKey(i18n.MsgIntentRichRate, locale,
+					map[string]string{"rate": rate})
+			}))
 	} else if intentTag == string(msgintent.IntentCommissionLookup) {
 		// Only surface "no commission info" when the user actually asked for it.
-		lines = append(lines, msgintent.RenderKey(i18n.MsgIntentRichRateMissing, locale, nil))
+		appendLine(p.settings.renderSlot(SlotRateMissing, nil, seed, func() string {
+			return msgintent.RenderKey(i18n.MsgIntentRichRateMissing, locale, nil)
+		}))
 	}
 	return &ChatResponse{Content: strings.Join(lines, "\n"), FinishReason: "stop"}
 }

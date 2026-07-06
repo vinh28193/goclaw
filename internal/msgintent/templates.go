@@ -93,29 +93,27 @@ func renderFromPool(pool []string, locale string, vars map[string]string, seed u
 		return ""
 	}
 	key := pool[seed%uint64(len(pool))]
-	msg := i18n.T(i18n.Normalize(locale), key)
-	if len(vars) == 0 {
-		return msg
-	}
-	pairs := make([]string, 0, len(vars)*2)
-	for k, v := range vars {
-		pairs = append(pairs, "{"+k+"}", v)
-	}
-	return strings.NewReplacer(pairs...).Replace(msg)
+	return RenderRaw(i18n.T(i18n.Normalize(locale), key), vars)
 }
 
 // RenderKey renders a single i18n key with {var} substitution — used for the
 // rich reply block lines (product/rate) that aren't part of a variation pool.
 func RenderKey(key, locale string, vars map[string]string) string {
-	msg := i18n.T(i18n.Normalize(locale), key)
+	return RenderRaw(i18n.T(i18n.Normalize(locale), key), vars)
+}
+
+// RenderRaw substitutes {var} placeholders in a raw template string — used by
+// operator-supplied template overrides (offline provider settings) that bypass
+// the i18n catalog.
+func RenderRaw(tmpl string, vars map[string]string) string {
 	if len(vars) == 0 {
-		return msg
+		return tmpl
 	}
 	pairs := make([]string, 0, len(vars)*2)
 	for k, v := range vars {
 		pairs = append(pairs, "{"+k+"}", v)
 	}
-	return strings.NewReplacer(pairs...).Replace(msg)
+	return strings.NewReplacer(pairs...).Replace(tmpl)
 }
 
 // SeedFromString derives a stable template-pick seed from a message ID so the

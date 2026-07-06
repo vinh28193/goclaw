@@ -185,6 +185,91 @@ func TestOfflineComposeCommissionMissingLine(t *testing.T) {
 	}
 }
 
+func TestOfflineReplyPrefix(t *testing.T) {
+	p := NewOfflineProvider("offline", ParseOfflineSettings(
+		json.RawMessage(`{"reply_prefix":"[offline]"}`)))
+
+	// Decline reply gets the prefix.
+	resp, _ := p.Chat(context.Background(), offlineReq(
+		"mai trời có mưa không?", "direct", false, offlineTestTools()))
+	if !strings.HasPrefix(resp.Content, "[offline] ") {
+		t.Fatalf("decline must carry prefix, got %q", resp.Content)
+	}
+
+	// NO_REPLY sentinel must NOT be prefixed (suppression machinery matches exact).
+	resp, _ = p.Chat(context.Background(), offlineReq(
+		"hôm nay đi ăn gì nhỉ hehe", "group", false, offlineTestTools()))
+	if resp.Content != "NO_REPLY" {
+		t.Fatalf("NO_REPLY must pass unprefixed, got %q", resp.Content)
+	}
+
+	// Tool-call turn has empty content — must stay empty.
+	resp, _ = p.Chat(context.Background(), offlineReq(
+		"https://shopee.vn/product-abc", "direct", false, offlineTestTools()))
+	if resp.Content != "" || len(resp.ToolCalls) == 0 {
+		t.Fatalf("tool-call turn must keep empty content, got %+v", resp)
+	}
+
+	// Composed rich reply gets the prefix.
+	resp, _ = p.Chat(context.Background(), composeReq("shortlink_offer",
+		`{"ok":true,"shortlink_url":"https://s.aff/abc"}`, `{"ok":false}`))
+	if !strings.HasPrefix(resp.Content, "[offline] ") {
+		t.Fatalf("composed reply must carry prefix, got %q", resp.Content)
+	}
+}
+
+func TestOfflineTemplateOverrides(t *testing.T) {
+	p := NewOfflineProvider("offline", ParseOfflineSettings(json.RawMessage(`{
+		"templates": {
+			"opener":    ["Link nè: {url}"],
+			"rate_line": ["Chiết khấu {rate} phần trăm"],
+			"decline":   ["Em chỉ xử lý link sản phẩm thôi ạ."]
+		}
+	}`)))
+
+	// Overridden opener + rate line render with vars substituted.
+	resp, _ := p.Chat(context.Background(), composeReq("commission_lookup",
+		`{"ok":true,"shortlink_url":"https://s.aff/abc"}`,
+		`{"ok":true,"rate":0.12,"product_name":"Áo thun"}`))
+	if !strings.Contains(resp.Content, "Link nè: https://s.aff/abc") {
+		t.Fatalf("opener override not applied: %q", resp.Content)
+	}
+	if !strings.Contains(resp.Content, "Chiết khấu 12 phần trăm") {
+		t.Fatalf("rate_line override not applied: %q", resp.Content)
+	}
+	// product_line has no override → built-in 📦 default still renders.
+	if !strings.Contains(resp.Content, "Áo thun") {
+		t.Fatalf("default product line missing: %q", resp.Content)
+	}
+
+	// Overridden decline.
+	resp, _ = p.Chat(context.Background(), offlineReq(
+		"mai trời có mưa không?", "direct", false, offlineTestTools()))
+	if resp.Content != "Em chỉ xử lý link sản phẩm thôi ạ." {
+		t.Fatalf("decline override not applied: %q", resp.Content)
+	}
+}
+
+func TestOfflineTemplateRemoveLineAndRequiredFallback(t *testing.T) {
+	p := NewOfflineProvider("offline", ParseOfflineSettings(json.RawMessage(`{
+		"templates": {
+			"rate_missing_line": [""],
+			"opener":            [""]
+		}
+	}`)))
+
+	// rate_missing_line overridden to "" → line dropped even on commission_lookup.
+	resp, _ := p.Chat(context.Background(), composeReq("commission_lookup",
+		`{"ok":true,"shortlink_url":"https://s.aff/abc"}`, `{"ok":false}`))
+	if strings.Contains(resp.Content, "💵") {
+		t.Fatalf("rate_missing_line [\"\"] must drop the 💵 line: %q", resp.Content)
+	}
+	// opener is REQUIRED — blank override falls back to built-in (never silent).
+	if !strings.Contains(resp.Content, "https://s.aff/abc") {
+		t.Fatalf("blank opener override must fall back to default: %q", resp.Content)
+	}
+}
+
 func TestOfflineSettingsParsing(t *testing.T) {
 	s := ParseOfflineSettings(nil)
 	if s.Tone != "humble" || s.Locale != "vi" {

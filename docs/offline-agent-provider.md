@@ -59,6 +59,17 @@ POST /v1/providers
   "settings": {
     "tone": "humble",          // casual | humble | business | minimal
     "locale": "vi",            // en | vi | zh
+    "reply_prefix": "",        // optional, e.g. "[offline]" — prepended to every
+                               // reply (NO_REPLY suppression passes unprefixed)
+    "templates": {             // optional per-slot overrides of the built-in
+                               // i18n pools; remove a key to restore defaults
+      "opener":            ["Link nè: {url}", "Của bạn đây: {url}"],
+      "decline":           ["Em chỉ xử lý link sản phẩm thôi ạ."],
+      "degraded":          ["Hệ thống đang bận, thử lại sau nhé."],
+      "product_line":      ["📦 {name}"],
+      "rate_line":         ["💵 Hoa hồng {rate}%"],
+      "rate_missing_line": ["💵 Chưa có thông tin hoa hồng."]
+    },
     "intent_config": {         // optional keyword EXTENSIONS for the classifier
       "commission_keywords": [], "broadcast_keywords": [], "question_keywords": []
     }
@@ -68,6 +79,20 @@ POST /v1/providers
 
 Multiple rows = multiple presets (e.g. `offline-business` with
 `{"tone":"business"}`).
+
+**Template override semantics** (`settings.templates`):
+- Keys are the 6 reply slots above; each value is a POOL — multiple entries
+  give per-message variation (deterministic seed pick, same as built-ins).
+- Vars per slot: `opener` → `{url}`, `product_line` → `{name}`,
+  `rate_line` → `{rate}`; `decline`/`degraded`/`rate_missing_line` take none.
+- Absent key or empty pool → built-in i18n pool (tone × locale) — so
+  "remove" = delete the key.
+- An entry rendering to `""` DROPS that line — but only for the optional
+  rich-block lines (`product_line`, `rate_line`, `rate_missing_line`);
+  `opener`/`decline`/`degraded` are required and fall back to the built-in
+  instead of going silent.
+- Updating settings via `PUT /v1/providers/{id}` rebuilds the provider
+  instance — no gateway restart needed.
 
 2. **Create/point an agent at it**: agent `provider` = the row name, `model`
    = `offline` (free-text; the value is ignored). Grant the agent the
