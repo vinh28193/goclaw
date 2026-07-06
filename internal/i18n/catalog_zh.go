@@ -394,5 +394,7 @@ func init() {
 		MsgIntentRichProduct:     "📦 {name}",
 		MsgIntentRichRate:        "💵 佣金 {rate}%",
 		MsgIntentRichRateMissing: "💵 暂无佣金信息",
+
+		MsgIntentHelp: "发送 Shopee/Lazada/TikTok 商品链接，我会返回短链接和佣金信息。",
 	})
 }

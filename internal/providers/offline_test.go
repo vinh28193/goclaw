@@ -250,6 +250,40 @@ func TestOfflineTemplateOverrides(t *testing.T) {
 	}
 }
 
+func TestOfflineHelpVar(t *testing.T) {
+	// Custom help_text substitutes into {help}.
+	p := NewOfflineProvider("offline", ParseOfflineSettings(json.RawMessage(`{
+		"help_text": "Gõ /start để xem hướng dẫn.",
+		"templates": {"decline": ["Em không rõ ạ. {help}"]}
+	}`)))
+	resp, _ := p.Chat(context.Background(), offlineReq(
+		"mai trời có mưa không?", "direct", false, offlineTestTools()))
+	if resp.Content != "Em không rõ ạ. Gõ /start để xem hướng dẫn." {
+		t.Fatalf("custom help_text not substituted: %q", resp.Content)
+	}
+
+	// No help_text → {help} falls back to the built-in locale hint (vi default).
+	p = NewOfflineProvider("offline", ParseOfflineSettings(json.RawMessage(`{
+		"templates": {"decline": ["{help}"]}
+	}`)))
+	resp, _ = p.Chat(context.Background(), offlineReq(
+		"mai trời có mưa không?", "direct", false, offlineTestTools()))
+	if !strings.Contains(resp.Content, "Shopee/Lazada/TikTok") || strings.Contains(resp.Content, "{help}") {
+		t.Fatalf("default help hint not rendered: %q", resp.Content)
+	}
+
+	// {help} works in compose-phase slots too (rate_missing_line).
+	p = NewOfflineProvider("offline", ParseOfflineSettings(json.RawMessage(`{
+		"help_text": "Hỏi em bằng: hoa hồng <link>",
+		"templates": {"rate_missing_line": ["💵 Chưa có info. {help}"]}
+	}`)))
+	resp, _ = p.Chat(context.Background(), composeReq("commission_lookup",
+		`{"ok":true,"shortlink_url":"https://s.aff/abc"}`, `{"ok":false}`))
+	if !strings.Contains(resp.Content, "Hỏi em bằng: hoa hồng <link>") {
+		t.Fatalf("help var missing in compose slot: %q", resp.Content)
+	}
+}
+
 func TestOfflineTemplateRemoveLineAndRequiredFallback(t *testing.T) {
 	p := NewOfflineProvider("offline", ParseOfflineSettings(json.RawMessage(`{
 		"templates": {

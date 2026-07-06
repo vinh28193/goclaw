@@ -61,6 +61,8 @@ POST /v1/providers
     "locale": "vi",            // en | vi | zh
     "reply_prefix": "",        // optional, e.g. "[offline]" — prepended to every
                                // reply (NO_REPLY suppression passes unprefixed)
+    "help_text": "",           // optional value for the {help} template var;
+                               // empty → built-in locale hint (msgintent.help)
     "templates": {             // optional per-slot overrides of the built-in
                                // i18n pools; remove a key to restore defaults
       "opener":            ["Link nè: {url}", "Của bạn đây: {url}"],
@@ -84,7 +86,10 @@ Multiple rows = multiple presets (e.g. `offline-business` with
 - Keys are the 6 reply slots above; each value is a POOL — multiple entries
   give per-message variation (deterministic seed pick, same as built-ins).
 - Vars per slot: `opener` → `{url}`, `product_line` → `{name}`,
-  `rate_line` → `{rate}`; `decline`/`degraded`/`rate_missing_line` take none.
+  `rate_line` → `{rate}`. EVERY slot additionally gets `{help}` — a usage
+  hint for guiding the user (e.g. in `decline`: `"Em không rõ ạ. {help}"`).
+  `{help}` resolves to `settings.help_text`, falling back to the built-in
+  locale-aware hint (`msgintent.help`, en/vi/zh).
 - Absent key or empty pool → built-in i18n pool (tone × locale) — so
   "remove" = delete the key.
 - An entry rendering to `""` DROPS that line — but only for the optional

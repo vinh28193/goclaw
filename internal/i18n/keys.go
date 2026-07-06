@@ -404,4 +404,8 @@ const (
 	MsgIntentRichProduct     = "msgintent.rich.product"
 	MsgIntentRichRate        = "msgintent.rich.rate"
 	MsgIntentRichRateMissing = "msgintent.rich.rate_missing"
+
+	// Default value for the {help} template var — usage hint operators can
+	// embed in offline-provider template overrides (settings.help_text overrides).
+	MsgIntentHelp = "msgintent.help"
 )

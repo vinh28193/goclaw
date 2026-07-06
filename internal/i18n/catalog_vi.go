@@ -394,5 +394,7 @@ func init() {
 		MsgIntentRichProduct:     "📦 {name}",
 		MsgIntentRichRate:        "💵 Hoa hồng {rate}%",
 		MsgIntentRichRateMissing: "💵 Hiện chưa có thông tin hoa hồng",
+
+		MsgIntentHelp: "Anh chị gửi em link sản phẩm Shopee/Lazada/TikTok, em sẽ trả link rút gọn kèm thông tin hoa hồng ạ.",
 	})
 }
