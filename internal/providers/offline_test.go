@@ -142,6 +142,24 @@ func TestOfflineComposeWrappedEnvelope(t *testing.T) {
 	}
 }
 
+func TestOfflineComposeBracesInsideProductName(t *testing.T) {
+	// Scraped product names can contain literal { or } — brace-counting in
+	// extractFirstJSONObject must ignore braces inside JSON strings, or the
+	// object is truncated → unmarshal fails → rate line silently drops.
+	p := NewOfflineProvider("offline", ParseOfflineSettings(nil))
+	resp, err := p.Chat(context.Background(), composeReq("shortlink_offer",
+		`{"ok":true,"shortlink_url":"https://s.aff/abc"}`,
+		`{"ok":true,"rate":0.1,"product_name":"Áo {SALE} 50% } khủng"}`))
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	for _, want := range []string{"https://s.aff/abc", "Áo {SALE} 50% } khủng", "10%"} {
+		if !strings.Contains(resp.Content, want) {
+			t.Fatalf("reply missing %q:\n%s", want, resp.Content)
+		}
+	}
+}
+
 func TestOfflineComposeShortlinkFailedDegrades(t *testing.T) {
 	p := NewOfflineProvider("offline", ParseOfflineSettings(nil))
 	resp, _ := p.Chat(context.Background(), composeReq("shortlink_offer",

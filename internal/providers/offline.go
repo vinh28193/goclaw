@@ -337,14 +337,32 @@ func findToolBySuffix(tools []ToolDefinition, suffix string) string {
 
 // extractFirstJSONObject pulls the first balanced {...} out of tool result
 // text (the MCP bridge wraps results in untrusted-content markers).
+// Braces inside JSON strings (e.g. a scraped product_name containing "{" or
+// "}") must not affect brace depth, so string state is tracked with escapes.
 func extractFirstJSONObject(content string) string {
 	start := strings.Index(content, "{")
 	if start < 0 {
 		return "{}"
 	}
 	depth := 0
+	inString := false
+	escaped := false
 	for i := start; i < len(content); i++ {
-		switch content[i] {
+		c := content[i]
+		if inString {
+			switch {
+			case escaped:
+				escaped = false
+			case c == '\\':
+				escaped = true
+			case c == '"':
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case '"':
+			inString = true
 		case '{':
 			depth++
 		case '}':
