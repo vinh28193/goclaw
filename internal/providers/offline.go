@@ -65,7 +65,17 @@ func (p *OfflineProvider) ChatStream(ctx context.Context, req ChatRequest, onChu
 
 // Chat is the rule engine. Two phases inferred from message history:
 // classify (fresh user message) and compose (our tool results came back).
+//
+// Per-agent override: when ChatRequest.Options[OptOfflineOverride] carries an
+// OfflineSettings value, it is merged on top of p.settings for this single
+// call. A per-call shallow clone (`q`) is used so classify/compose/reclassify
+// see the effective settings via the receiver — no field on `p` is mutated
+// and concurrent Chat calls for different agents stay isolated.
 func (p *OfflineProvider) Chat(_ context.Context, req ChatRequest) (*ChatResponse, error) {
+	q := p
+	if override, ok := req.Options[OptOfflineOverride].(OfflineSettings); ok {
+		q = &OfflineProvider{name: p.name, settings: MergeOfflineSettings(override, p.settings)}
+	}
 	var resp *ChatResponse
 	if results, intentTag, ok := trailingOfflineToolResults(req.Messages); ok {
 		if intentTag == "" {
@@ -73,15 +83,15 @@ func (p *OfflineProvider) Chat(_ context.Context, req ChatRequest) (*ChatRespons
 			// intent tag encoded in our IDs is usually lost by the time results
 			// come back. Re-classify the originating user message — deterministic,
 			// so it recovers the same intent.
-			intentTag = p.reclassifyIntentTag(req)
+			intentTag = q.reclassifyIntentTag(req)
 		}
-		resp = p.compose(req, results, intentTag)
+		resp = q.compose(req, results, intentTag)
 	} else {
-		resp = p.classify(req)
+		resp = q.classify(req)
 	}
 	// Single application point for the operator prefix — NO_REPLY and
 	// tool-call turns (empty content) pass through unchanged.
-	resp.Content = p.settings.withPrefix(resp.Content)
+	resp.Content = q.settings.withPrefix(resp.Content)
 	return resp, nil
 }
 

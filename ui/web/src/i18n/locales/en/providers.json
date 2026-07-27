@@ -136,6 +136,80 @@
     "workDirPlaceholder": "/tmp/workspace",
     "workDirHint": "Working directory for agent subprocesses (optional)"
   },
+  "offline": {
+    "description": "Rule-based agent. No LLM. Configure reply voice, templates and keyword overrides.",
+    "groups": {
+      "voice": "Voice",
+      "prefixHelp": "Prefix & Help Text",
+      "templates": "Reply Templates",
+      "keywords": "Keyword Overrides"
+    },
+    "tone": {
+      "label": "Tone",
+      "humble": "Humble",
+      "casual": "Casual",
+      "business": "Business",
+      "minimal": "Minimal"
+    },
+    "locale": {
+      "label": "Reply Locale",
+      "vi": "Vietnamese",
+      "en": "English",
+      "zh": "Chinese"
+    },
+    "replyPrefix": {
+      "label": "Reply Prefix",
+      "placeholder": "[offline]",
+      "hint": "Prepended to every reply (except the NO_REPLY sentinel)."
+    },
+    "helpText": {
+      "label": "Help Text",
+      "placeholder": "Send me a product URL to get commission.",
+      "hint": "Value of the {help} template var. Empty = built-in i18n hint."
+    },
+    "templates": {
+      "commonHint": "One template per line. Multiple lines = deterministic pick per message.",
+      "vars": "Available vars: {{vars}}",
+      "opener": {
+        "label": "Opener (rich-reply opening)",
+        "placeholder": "Here's what I found for {url}:"
+      },
+      "decline": {
+        "label": "Decline (off-scope / no-tool)",
+        "placeholder": "I can only help with commission lookups. {help}"
+      },
+      "degraded": {
+        "label": "Degraded (shortlink tool failed)",
+        "placeholder": "System busy — try again shortly. {help}"
+      },
+      "productLine": {
+        "label": "Product line (empty line = drop it)",
+        "placeholder": "📦 {name}"
+      },
+      "rateLine": {
+        "label": "Rate line (empty line = drop it)",
+        "placeholder": "💵 {rate}"
+      },
+      "rateMissingLine": {
+        "label": "Rate-missing line (empty line = drop it)",
+        "placeholder": "💵 Rate info not available yet."
+      }
+    },
+    "keywords": {
+      "commission": {
+        "label": "Commission keywords",
+        "hint": "Words that (with a platform URL) trigger commission lookup. Empty = defaults."
+      },
+      "broadcast": {
+        "label": "Broadcast keywords",
+        "hint": "Words that trigger commission broadcast. Empty = defaults."
+      },
+      "question": {
+        "label": "Question keywords",
+        "hint": "Interrogative markers used to detect questions. Empty = defaults."
+      }
+    }
+  },
   "oauth": {
     "checkingStatus": "Checking authentication status...",
     "authSuccessful": "Authentication successful!",
@@ -188,6 +262,8 @@
     "connectionDesc": "API endpoint configuration",
     "acpConfig": "ACP Configuration",
     "acpConfigDesc": "Agent subprocess settings",
+    "offlineConfig": "Offline Agent",
+    "offlineConfigDesc": "Voice, templates and keyword overrides",
     "cliConfig": "Claude CLI",
     "cliConfigDesc": "Local CLI authentication",
     "oauthConfig": "ChatGPT Subscription (OAuth)",

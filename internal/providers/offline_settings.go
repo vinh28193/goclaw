@@ -50,6 +50,91 @@ func ParseOfflineSettings(raw json.RawMessage) OfflineSettings {
 	return s
 }
 
+// ParseAgentOfflineOverride extracts a per-agent override from
+// agent.other_config.offline (JSONB subkey). Unlike ParseOfflineSettings this
+// does NOT default-fill Tone/Locale — zero values signal "this field is not
+// overridden" so downstream MergeOfflineSettings can fall back to the provider
+// value. Malformed / empty input yields a zero-value struct (no panic).
+func ParseAgentOfflineOverride(raw json.RawMessage) OfflineSettings {
+	var s OfflineSettings
+	if len(raw) == 0 {
+		return s
+	}
+	_ = json.Unmarshal(raw, &s)
+	return s
+}
+
+// MergeOfflineSettings folds an agent-level override on top of provider
+// defaults, per-field. Agent wins on non-empty / valid values; provider fills
+// the rest. Both inputs are treated as immutable — result never aliases input
+// maps. Deterministic + idempotent: MergeOfflineSettings(a, MergeOfflineSettings(a, p))
+// yields the same value as MergeOfflineSettings(a, p) up to structural equality.
+func MergeOfflineSettings(agent, provider OfflineSettings) OfflineSettings {
+	out := provider
+	if msgintent.ValidTone(agent.Tone) {
+		out.Tone = agent.Tone
+	}
+	if agent.Locale != "" {
+		out.Locale = agent.Locale
+	}
+	if agent.ReplyPrefix != "" {
+		out.ReplyPrefix = agent.ReplyPrefix
+	}
+	if agent.HelpText != "" {
+		out.HelpText = agent.HelpText
+	}
+	out.Templates = mergeTemplatePools(agent.Templates, provider.Templates)
+	out.IntentConfig = mergeIntentConfig(agent.IntentConfig, provider.IntentConfig)
+	return out
+}
+
+// mergeTemplatePools returns a new map holding, for each slot present in
+// either input, the agent pool when it has ≥1 entry, otherwise the provider
+// pool. An agent slot present but empty (`[]`) is treated as "not overridden"
+// so removing all lines in the UI reverts to provider defaults.
+func mergeTemplatePools(agent, provider map[string][]string) map[string][]string {
+	if len(agent) == 0 && len(provider) == 0 {
+		return nil
+	}
+	out := make(map[string][]string, len(agent)+len(provider))
+	for slot, pool := range provider {
+		out[slot] = pool
+	}
+	for slot, pool := range agent {
+		if len(pool) > 0 {
+			out[slot] = pool
+		}
+	}
+	return out
+}
+
+// mergeIntentConfig merges the three keyword lists per-list. Nil in both →
+// nil out (avoids allocating an empty struct when neither side configured
+// keyword overrides).
+func mergeIntentConfig(agent, provider *msgintent.KeywordOverrides) *msgintent.KeywordOverrides {
+	if agent == nil && provider == nil {
+		return nil
+	}
+	out := &msgintent.KeywordOverrides{}
+	if provider != nil {
+		out.CommissionKeywords = provider.CommissionKeywords
+		out.BroadcastKeywords = provider.BroadcastKeywords
+		out.QuestionKeywords = provider.QuestionKeywords
+	}
+	if agent != nil {
+		if len(agent.CommissionKeywords) > 0 {
+			out.CommissionKeywords = agent.CommissionKeywords
+		}
+		if len(agent.BroadcastKeywords) > 0 {
+			out.BroadcastKeywords = agent.BroadcastKeywords
+		}
+		if len(agent.QuestionKeywords) > 0 {
+			out.QuestionKeywords = agent.QuestionKeywords
+		}
+	}
+	return out
+}
+
 // renderSlot renders an operator override for slot, or fallback() when no
 // override is configured. An override entry that renders to "" is returned
 // as-is — the caller decides whether empty means "drop the line" (rich-block

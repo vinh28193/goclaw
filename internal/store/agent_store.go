@@ -275,6 +275,26 @@ func ParseInboundDebounceMsFromOtherConfig(raw json.RawMessage) (int, bool) {
 	return *bag.InboundDebounceMs, true
 }
 
+// ParseOfflineOverrideRaw returns the raw JSON bytes stored under
+// other_config.offline so the caller can hand them to
+// providers.ParseAgentOfflineOverride without pulling providers into this
+// package. Returns nil when the agent has no override configured (or the
+// column is malformed).
+func (a *AgentData) ParseOfflineOverrideRaw() json.RawMessage {
+	return ParseOfflineOverrideRawFromOtherConfig(a.OtherConfig)
+}
+
+func ParseOfflineOverrideRawFromOtherConfig(raw json.RawMessage) json.RawMessage {
+	if len(raw) <= 2 {
+		return nil
+	}
+	var bag map[string]json.RawMessage
+	if json.Unmarshal(raw, &bag) != nil {
+		return nil
+	}
+	return bag["offline"]
+}
+
 // validPromptModes is the set of allowed prompt_mode values.
 var validPromptModes = map[string]bool{
 	"full": true, "task": true, "minimal": true, "none": true,

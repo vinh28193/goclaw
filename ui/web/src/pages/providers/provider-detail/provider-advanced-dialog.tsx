@@ -21,6 +21,13 @@ import { ConfigGroupHeader } from "@/components/shared/config-group-header";
 import { PROVIDER_TYPES } from "@/constants/providers";
 import { CLISection } from "../provider-cli-section";
 import { OAuthSection } from "../provider-oauth-section";
+import { OfflineSettingsForm } from "@/components/shared/offline-settings-form";
+import {
+  emptyOfflineFormState,
+  parseOfflineSettings,
+  serializeOfflineSettings,
+  type OfflineFormState,
+} from "@/lib/offline-settings-serde";
 import type { ProviderData, ProviderInput } from "@/types/provider";
 
 interface ProviderAdvancedDialogProps {
@@ -53,7 +60,8 @@ export function ProviderAdvancedDialog({
   const isACP = provider.provider_type === "acp";
   const isCLI = provider.provider_type === "claude_cli";
   const isOAuth = provider.provider_type === "chatgpt_oauth";
-  const isStandard = !isACP && !isCLI && !isOAuth;
+  const isOffline = provider.provider_type === "offline";
+  const isStandard = !isACP && !isCLI && !isOAuth && !isOffline;
 
   const typeInfo = PROVIDER_TYPES.find((pt) => pt.value === provider.provider_type);
 
@@ -64,6 +72,9 @@ export function ProviderAdvancedDialog({
   const [acpIdleTTL, setAcpIdleTTL] = useState(init.acpIdleTTL);
   const [acpPermMode, setAcpPermMode] = useState(init.acpPermMode);
   const [acpWorkDir, setAcpWorkDir] = useState(init.acpWorkDir);
+  const [offlineState, setOfflineState] = useState<OfflineFormState>(() =>
+    isOffline ? parseOfflineSettings(provider.settings) : emptyOfflineFormState(),
+  );
 
   // Re-sync when dialog opens
   useEffect(() => {
@@ -75,8 +86,11 @@ export function ProviderAdvancedDialog({
     setAcpIdleTTL(s.acpIdleTTL);
     setAcpPermMode(s.acpPermMode);
     setAcpWorkDir(s.acpWorkDir);
-     
-  }, [open, provider]);
+    if (isOffline) {
+      setOfflineState(parseOfflineSettings(provider.settings));
+    }
+
+  }, [open, provider, isOffline]);
 
   const [saving, setSaving] = useState(false);
 
@@ -96,6 +110,8 @@ export function ProviderAdvancedDialog({
         if (acpPermMode) settings.perm_mode = acpPermMode;
         if (acpWorkDir.trim()) settings.work_dir = acpWorkDir.trim();
         if (Object.keys(settings).length > 0) data.settings = settings;
+      } else if (isOffline) {
+        data.settings = serializeOfflineSettings(offlineState) as Record<string, unknown>;
       } else if (isStandard) {
         data.api_base = apiBase.trim() || undefined;
       }
@@ -238,6 +254,20 @@ export function ProviderAdvancedDialog({
                 description={t("detail.cliConfigDesc")}
               />
               <CLISection open={open} />
+            </>
+          )}
+
+          {/* Offline Agent */}
+          {isOffline && (
+            <>
+              <ConfigGroupHeader
+                title={t("detail.offlineConfig")}
+                description={t("detail.offlineConfigDesc")}
+              />
+              <OfflineSettingsForm
+                value={offlineState}
+                onChange={setOfflineState}
+              />
             </>
           )}
 

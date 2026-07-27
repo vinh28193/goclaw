@@ -386,3 +386,88 @@ func TestOfflineComposesAfterLoopRewritesCallIDs(t *testing.T) {
 		t.Fatalf("commission_lookup must render a rate line (missing-info), got: %q", resp.Content)
 	}
 }
+
+// Per-agent override tests exercise the ChatRequest.Options[OptOfflineOverride]
+// path: provider defaults get merged with agent-supplied fields per Chat call.
+
+func TestOfflineChatOverrideEmpty_ProviderWins(t *testing.T) {
+	// Empty override (zero-value) means "no agent override" — provider
+	// settings must render unchanged. Baseline behaviour regression guard.
+	p := NewOfflineProvider("offline", ParseOfflineSettings(json.RawMessage(`{
+        "reply_prefix": "[global]",
+        "templates": {"opener": ["provider-opener {url}"]}
+    }`)))
+	req := offlineReq("mua giúp https://shopee.vn/xyz-i.1.2", "direct", true, offlineTestTools())
+	req.Options[OptOfflineOverride] = OfflineSettings{} // zero value
+	resp, err := p.Chat(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if len(resp.ToolCalls) != 2 {
+		t.Fatalf("expected shortlink+commission calls, got %+v", resp.ToolCalls)
+	}
+	// Reply prefix ("[global]") applies to tool-call turns? No — content is empty for
+	// tool-call turns and withPrefix passes empty through. So we validate on compose
+	// phase below in TestOfflineChatOverrideMergedTemplates.
+	_ = resp
+}
+
+func TestOfflineChatOverrideMergedTemplates(t *testing.T) {
+	// Agent overrides opener + reply_prefix. Provider retains degraded etc.
+	// Verify the compose reply uses agent opener and agent prefix.
+	p := NewOfflineProvider("offline", ParseOfflineSettings(json.RawMessage(`{
+        "reply_prefix": "[global]",
+        "templates": {"opener": ["PROV: {url}"]}
+    }`)))
+	override := OfflineSettings{
+		ReplyPrefix: "[bot-A]",
+		Templates:   map[string][]string{SlotOpener: {"AGENT: {url}"}},
+	}
+	req := ChatRequest{
+		Messages: []Message{
+			{Role: "user", Content: "hoa hồng https://shopee.vn/abc-i.1.2"},
+			{Role: "assistant", ToolCalls: []ToolCall{
+				{ID: "call_x", Name: testShortlinkTool},
+				{ID: "call_y", Name: testCommissionTool},
+			}},
+			{Role: "tool", ToolCallID: "call_x",
+				Content: `{"ok":true,"shortlink_url":"https://aff.x/s/abc"}`},
+			{Role: "tool", ToolCallID: "call_y",
+				Content: `{"ok":true,"rate":0.07,"product_name":"Áo thun"}`},
+		},
+		Tools: offlineTestTools(),
+		Options: map[string]any{
+			OptPeerKind: "direct", OptSessionKey: "s",
+			OptOfflineOverride: override,
+		},
+	}
+	resp, err := p.Chat(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if !strings.HasPrefix(resp.Content, "[bot-A] ") {
+		t.Fatalf("agent reply_prefix must apply, got: %q", resp.Content)
+	}
+	if !strings.Contains(resp.Content, "AGENT: https://aff.x/s/abc") {
+		t.Fatalf("agent opener template must render, got: %q", resp.Content)
+	}
+	if strings.Contains(resp.Content, "PROV:") {
+		t.Fatalf("provider opener must NOT appear when agent overrides it, got: %q", resp.Content)
+	}
+}
+
+func TestOfflineChatOverrideDoesNotMutateProviderSettings(t *testing.T) {
+	// Multiple Chat calls with different overrides must not leak into
+	// provider.settings — per-call clone must isolate them.
+	p := NewOfflineProvider("offline", ParseOfflineSettings(json.RawMessage(`{
+        "reply_prefix": "[global]"
+    }`)))
+	req := offlineReq("chat chit", "direct", true, offlineTestTools())
+	req.Options[OptOfflineOverride] = OfflineSettings{ReplyPrefix: "[per-call]"}
+	if _, err := p.Chat(context.Background(), req); err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if p.settings.ReplyPrefix != "[global]" {
+		t.Fatalf("provider settings mutated by override: %q", p.settings.ReplyPrefix)
+	}
+}

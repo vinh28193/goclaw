@@ -141,6 +141,80 @@
     "workDirPlaceholder": "/tmp/workspace",
     "workDirHint": "Thư mục làm việc cho tiến trình con agent (tùy chọn)"
   },
+  "offline": {
+    "description": "Agent theo luật (rule-based). Không LLM. Cấu hình giọng trả lời, template và từ khóa.",
+    "groups": {
+      "voice": "Giọng nói",
+      "prefixHelp": "Tiền tố & Trợ giúp",
+      "templates": "Mẫu trả lời",
+      "keywords": "Ghi đè từ khóa"
+    },
+    "tone": {
+      "label": "Giọng",
+      "humble": "Khiêm tốn",
+      "casual": "Thân mật",
+      "business": "Trang trọng",
+      "minimal": "Tối giản"
+    },
+    "locale": {
+      "label": "Ngôn ngữ trả lời",
+      "vi": "Tiếng Việt",
+      "en": "Tiếng Anh",
+      "zh": "Tiếng Trung"
+    },
+    "replyPrefix": {
+      "label": "Tiền tố trả lời",
+      "placeholder": "[offline]",
+      "hint": "Thêm vào đầu mọi câu trả lời (trừ NO_REPLY)."
+    },
+    "helpText": {
+      "label": "Nội dung trợ giúp",
+      "placeholder": "Gửi link sản phẩm để em check hoa hồng nhé.",
+      "hint": "Giá trị của biến {help}. Bỏ trống = dùng gợi ý i18n mặc định."
+    },
+    "templates": {
+      "commonHint": "Mỗi dòng là một template. Nhiều dòng = chọn deterministic theo tin nhắn.",
+      "vars": "Biến khả dụng: {{vars}}",
+      "opener": {
+        "label": "Mở đầu (dòng đầu rich-reply)",
+        "placeholder": "Đây shop ơi 👉 {url}"
+      },
+      "decline": {
+        "label": "Từ chối (ngoài phạm vi / thiếu tool)",
+        "placeholder": "Em chỉ giúp check hoa hồng ạ. {help}"
+      },
+      "degraded": {
+        "label": "Suy giảm (tool shortlink lỗi)",
+        "placeholder": "Hệ thống đang bận, thử lại sau nhé. {help}"
+      },
+      "productLine": {
+        "label": "Dòng sản phẩm (dòng trống = bỏ dòng)",
+        "placeholder": "📦 {name}"
+      },
+      "rateLine": {
+        "label": "Dòng % hoa hồng (dòng trống = bỏ dòng)",
+        "placeholder": "💵 {rate}"
+      },
+      "rateMissingLine": {
+        "label": "Dòng chưa có hoa hồng (dòng trống = bỏ dòng)",
+        "placeholder": "💵 Chưa có thông tin hoa hồng."
+      }
+    },
+    "keywords": {
+      "commission": {
+        "label": "Từ khóa hoa hồng",
+        "hint": "Từ ngữ (kèm URL sàn) kích hoạt tra hoa hồng. Bỏ trống = mặc định."
+      },
+      "broadcast": {
+        "label": "Từ khóa broadcast",
+        "hint": "Từ ngữ kích hoạt broadcast hoa hồng. Bỏ trống = mặc định."
+      },
+      "question": {
+        "label": "Từ khóa câu hỏi",
+        "hint": "Dấu hiệu câu hỏi. Bỏ trống = mặc định."
+      }
+    }
+  },
   "oauth": {
     "checkingStatus": "Đang kiểm tra trạng thái xác thực...",
     "authSuccessful": "Xác thực thành công!",
@@ -192,6 +266,8 @@
     "connectionDesc": "Cấu hình endpoint API",
     "acpConfig": "Cấu hình ACP",
     "acpConfigDesc": "Cài đặt tiến trình con agent",
+    "offlineConfig": "Offline Agent",
+    "offlineConfigDesc": "Giọng nói, mẫu trả lời và ghi đè từ khóa",
     "cliConfig": "Claude CLI",
     "cliConfigDesc": "Xác thực CLI cục bộ",
     "oauthConfig": "ChatGPT Subscription (OAuth)",

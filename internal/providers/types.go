@@ -25,6 +25,12 @@ const (
 	OptFastMode             = "fast_mode"
 	OptPromptCacheKey       = "prompt_cache_key"
 	OptPromptCacheRetention = "prompt_cache_retention"
+
+	// OptOfflineOverride carries a per-agent OfflineSettings override that the
+	// offline provider merges on top of its stored settings for that Chat call.
+	// Value type is OfflineSettings (value, not pointer). Non-offline providers
+	// ignore this key. Zero value = "no override" — provider defaults apply.
+	OptOfflineOverride = "offline_override"
 )
 
 // TokenSource provides an OAuth access token (with auto-refresh).

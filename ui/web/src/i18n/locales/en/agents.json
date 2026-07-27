@@ -308,6 +308,10 @@
     "saved": "Saved",
     "failedToSave": "Failed to save"
   },
+  "offline": {
+    "sectionTitle": "Voice & Templates (offline)",
+    "sectionDescription": "Per-agent override for tone, prefix, help text, templates and intent keywords. Blank fields inherit the offline provider defaults."
+  },
   "chatgptOAuthRouting": {
     "title": "Codex OAuth Pool",
     "description": "Edit the saved pool, then check it live.",

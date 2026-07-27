@@ -293,6 +293,10 @@
     "saved": "Đã lưu",
     "failedToSave": "Lưu thất bại"
   },
+  "offline": {
+    "sectionTitle": "Giọng nói & Template (offline)",
+    "sectionDescription": "Override per-agent cho tone, prefix, help text, templates và intent keywords. Field bỏ trống sẽ kế thừa defaults của offline provider."
+  },
   "chatgptOAuthRouting": {
     "title": "Pool Codex OAuth",
     "description": "Chỉnh pool đã lưu rồi kiểm tra trực tiếp.",

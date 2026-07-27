@@ -293,6 +293,10 @@
     "saved": "已保存",
     "failedToSave": "保存失败"
   },
+  "offline": {
+    "sectionTitle": "语气与模板（离线）",
+    "sectionDescription": "覆盖 agent 级别的语气、前缀、帮助文本、模板与意图关键词。留空的字段将继承离线 provider 的默认值。"
+  },
   "chatgptOAuthRouting": {
     "title": "Codex OAuth 池",
     "description": "编辑已保存的池，然后直接检查。",

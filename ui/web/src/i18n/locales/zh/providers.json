@@ -150,6 +150,80 @@
     "workDirPlaceholder": "/tmp/workspace",
     "workDirHint": "代理子进程的工作目录（可选）"
   },
+  "offline": {
+    "description": "基于规则的代理。无 LLM。可配置回复语气、模板与关键词覆盖。",
+    "groups": {
+      "voice": "语气",
+      "prefixHelp": "前缀与帮助文本",
+      "templates": "回复模板",
+      "keywords": "关键词覆盖"
+    },
+    "tone": {
+      "label": "语气",
+      "humble": "谦逊",
+      "casual": "随意",
+      "business": "商务",
+      "minimal": "极简"
+    },
+    "locale": {
+      "label": "回复语言",
+      "vi": "越南语",
+      "en": "英语",
+      "zh": "中文"
+    },
+    "replyPrefix": {
+      "label": "回复前缀",
+      "placeholder": "[offline]",
+      "hint": "附加到每条回复的开头（NO_REPLY 除外）。"
+    },
+    "helpText": {
+      "label": "帮助文本",
+      "placeholder": "发送商品链接以查询佣金。",
+      "hint": "{help} 模板变量的值。留空 = 使用内置 i18n 提示。"
+    },
+    "templates": {
+      "commonHint": "每行一个模板。多行则按消息确定性选择。",
+      "vars": "可用变量：{{vars}}",
+      "opener": {
+        "label": "开场（rich-reply 首行）",
+        "placeholder": "为您找到 {url}："
+      },
+      "decline": {
+        "label": "拒绝（超出范围 / 无工具）",
+        "placeholder": "我只能帮您查询佣金。{help}"
+      },
+      "degraded": {
+        "label": "降级（shortlink 工具失败）",
+        "placeholder": "系统繁忙，请稍后再试。{help}"
+      },
+      "productLine": {
+        "label": "商品行（留空 = 省略此行）",
+        "placeholder": "📦 {name}"
+      },
+      "rateLine": {
+        "label": "费率行（留空 = 省略此行）",
+        "placeholder": "💵 {rate}"
+      },
+      "rateMissingLine": {
+        "label": "费率缺失行（留空 = 省略此行）",
+        "placeholder": "💵 暂无佣金信息。"
+      }
+    },
+    "keywords": {
+      "commission": {
+        "label": "佣金关键词",
+        "hint": "（与平台 URL 一起）触发佣金查询的词。留空 = 使用默认值。"
+      },
+      "broadcast": {
+        "label": "广播关键词",
+        "hint": "触发佣金广播的词。留空 = 使用默认值。"
+      },
+      "question": {
+        "label": "问题关键词",
+        "hint": "用于识别问题的疑问词。留空 = 使用默认值。"
+      }
+    }
+  },
   "oauth": {
     "checkingStatus": "正在检查认证状态...",
     "authSuccessful": "认证成功！",
@@ -210,6 +284,8 @@
     "connectionDesc": "API端点配置",
     "acpConfig": "ACP配置",
     "acpConfigDesc": "Agent子进程设置",
+    "offlineConfig": "离线 Agent",
+    "offlineConfigDesc": "语气、模板与关键词覆盖",
     "cliConfig": "Claude CLI",
     "cliConfigDesc": "本地CLI认证",
     "oauthConfig": "ChatGPT Subscription (OAuth)",

@@ -28,9 +28,14 @@ import { DEFAULT_CODEX_OAUTH_ALIAS, PROVIDER_TYPES, suggestUniqueProviderAlias }
 import { OAuthSection } from "./provider-oauth-section";
 import { CLISection } from "./provider-cli-section";
 import { ACPSection } from "./provider-acp-section";
+import { OfflineSettingsForm } from "@/components/shared/offline-settings-form";
 import { ProviderStandardFormFields } from "./provider-standard-form-fields";
 import { Loader2 } from "lucide-react";
 import { providerCreateSchema, type ProviderCreateFormData } from "@/schemas/provider.schema";
+import {
+  emptyOfflineFormState,
+  serializeOfflineSettings,
+} from "@/lib/offline-settings-serde";
 
 interface ProviderFormDialogProps {
   open: boolean;
@@ -58,6 +63,7 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
       acpIdleTTL: "",
       acpPermMode: "approve-all",
       acpWorkDir: "",
+      offlineSettings: emptyOfflineFormState(),
     },
   });
 
@@ -88,6 +94,7 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
         acpIdleTTL: "",
         acpPermMode: "approve-all",
         acpWorkDir: "",
+        offlineSettings: emptyOfflineFormState(),
       });
     }
   }, [open, reset]);
@@ -111,7 +118,15 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
       if (Object.keys(settings).length > 0) payload.settings = settings;
     }
 
-    if (data.apiKey && data.apiKey !== "***") {
+    if (isOffline) {
+      // Offline agent has no API key/base to send — serializer strips defaults.
+      payload.api_base = undefined;
+      if (data.offlineSettings) {
+        payload.settings = serializeOfflineSettings(data.offlineSettings) as Record<string, unknown>;
+      }
+    }
+
+    if (!isOffline && data.apiKey && data.apiKey !== "***") {
       payload.api_key = data.apiKey;
     }
 
@@ -222,6 +237,19 @@ export function ProviderFormDialog({ open, onOpenChange, onSubmit, existingProvi
                   onPermModeChange={(v) => setValue("acpPermMode", v)}
                   workDir={watch("acpWorkDir") || ""}
                   onWorkDirChange={(v) => setValue("acpWorkDir", v)}
+                />
+              )}
+
+              {isOffline && (
+                <Controller
+                  control={control}
+                  name="offlineSettings"
+                  render={({ field }) => (
+                    <OfflineSettingsForm
+                      value={field.value ?? emptyOfflineFormState()}
+                      onChange={field.onChange}
+                    />
+                  )}
                 />
               )}
 

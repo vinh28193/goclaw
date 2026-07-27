@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useProviders } from "@/pages/providers/hooks/use-providers";
 import type {
   AgentData, MemoryConfig, SubagentsConfig, ToolPolicyConfig,
 } from "@/types/agent";
@@ -13,6 +14,7 @@ import { PinnedSkillsSection } from "./overview-sections/pinned-skills-section";
 import { OrchestrationSection } from "./overview-sections/orchestration-section";
 import { CapabilitiesSection } from "./overview-sections/capabilities-section";
 import { ChatGPTOAuthRoutingSummarySection } from "./overview-sections/chatgpt-oauth-routing-summary-section";
+import { AgentOfflineSection } from "./overview-sections/agent-offline-section";
 import { HeartbeatCard } from "./overview-sections/heartbeat-card";
 import { HooksSummaryCard } from "./overview-sections/hooks-summary-card";
 import { MemorySection } from "./config-sections";
@@ -29,6 +31,15 @@ interface AgentOverviewTabProps {
 
 export function AgentOverviewTab({ agent, onUpdate, heartbeat, onManageCodexPool, onViewHooks, onAddHook }: AgentOverviewTabProps) {
   const { t } = useTranslation("agents");
+
+  // Offline agents run a rule-based provider that ignores system prompt,
+  // memory, skills, evolution, and orchestration — hide those sections so
+  // the config surface only shows fields that actually take effect.
+  const { providers } = useProviders();
+  const isOfflineAgent = useMemo(
+    () => providers.find((p) => p.name === agent.provider)?.provider_type === "offline",
+    [providers, agent.provider],
+  );
 
   // Personality
   const [emoji, setEmoji] = useState(agent.emoji ?? "");
@@ -113,7 +124,7 @@ export function AgentOverviewTab({ agent, onUpdate, heartbeat, onManageCodexPool
 
   return (
     <div className="space-y-4">
-      <PromptSettingsSection agent={agent} onUpdate={onUpdate} />
+      {!isOfflineAgent && <PromptSettingsSection agent={agent} onUpdate={onUpdate} />}
 
       <PersonalitySection
         agentKey={agent.agent_key}
@@ -152,7 +163,9 @@ export function AgentOverviewTab({ agent, onUpdate, heartbeat, onManageCodexPool
         </p>
       )}
 
-      {agent.agent_type === "predefined" && (
+      <AgentOfflineSection agent={agent} onUpdate={onUpdate} />
+
+      {!isOfflineAgent && agent.agent_type === "predefined" && (
         <EvolutionSection
           agentId={agent.id}
           selfEvolve={selfEvolve}
@@ -164,11 +177,13 @@ export function AgentOverviewTab({ agent, onUpdate, heartbeat, onManageCodexPool
         />
       )}
 
-      {/* Memory — always visible, per-agent overrides */}
-      <MemorySection
-        value={mem}
-        onChange={setMem}
-      />
+      {/* Memory — LLM-only; hide for offline agents. */}
+      {!isOfflineAgent && (
+        <MemorySection
+          value={mem}
+          onChange={setMem}
+        />
+      )}
 
       <HeartbeatCard heartbeat={heartbeat} />
 
@@ -178,10 +193,10 @@ export function AgentOverviewTab({ agent, onUpdate, heartbeat, onManageCodexPool
         onAddHook={onAddHook}
       />
 
-      <SkillsSection agentId={agent.id} />
-      <PinnedSkillsSection agent={agent} onUpdate={onUpdate} />
+      {!isOfflineAgent && <SkillsSection agentId={agent.id} />}
+      {!isOfflineAgent && <PinnedSkillsSection agent={agent} onUpdate={onUpdate} />}
 
-      <OrchestrationSection agentId={agent.id} />
+      {!isOfflineAgent && <OrchestrationSection agentId={agent.id} />}
 
       <CapabilitiesSection
         subEnabled={subEnabled}

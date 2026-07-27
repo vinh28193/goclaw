@@ -40,6 +40,7 @@ import { toPoolEntries } from "@/adapters/provider-pool.adapter";
 import {
   NO_API_KEY_TYPES,
   NO_EMBEDDING_TYPES,
+  NO_PRICING_TYPES,
   SIMPLE_REASONING_LEVELS,
   providerStatus,
   routingSignature,
@@ -64,6 +65,7 @@ export function ProviderOverview({ provider, onUpdate }: ProviderOverviewProps) 
   const typeLabel = typeInfo?.label ?? provider.provider_type;
   const showApiKey = !NO_API_KEY_TYPES.has(provider.provider_type);
   const showEmbedding = !NO_EMBEDDING_TYPES.has(provider.provider_type);
+  const showPricing = !NO_PRICING_TYPES.has(provider.provider_type);
   const isOAuth = provider.provider_type === "chatgpt_oauth";
 
   // --- Pool ownership & status maps ---
@@ -286,7 +288,7 @@ export function ProviderOverview({ provider, onUpdate }: ProviderOverviewProps) 
         </section>
       ) : null}
 
-      <ProviderPricingSection provider={provider} />
+      {showPricing ? <ProviderPricingSection provider={provider} /> : null}
 
       {showEmbedding ? (
         <ProviderEmbeddingSection embEnabled={embEnabled} setEmbEnabled={setEmbEnabled} embModel={embModel} setEmbModel={setEmbModel} embApiBase={embApiBase} setEmbApiBase={setEmbApiBase} onVerify={() => verifyEmbedding(provider.id, embModel.trim() || undefined, undefined)} verifying={embVerifying} verifyResult={embResult} />
