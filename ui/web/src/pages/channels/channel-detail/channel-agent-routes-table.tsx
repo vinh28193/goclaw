@@ -53,6 +53,7 @@ export function AgentRoutesTable({
             <th className="px-2 py-2 text-left font-medium">{t("detail.agentRoutes.columns.mention")}</th>
             <th className="px-2 py-2 text-right font-medium">{t("detail.agentRoutes.columns.priority")}</th>
             <th className="px-2 py-2 text-left font-medium">{t("detail.agentRoutes.columns.toolAllow")}</th>
+            <th className="px-2 py-2 text-left font-medium">{t("detail.agentRoutes.fields.routePeerId")}</th>
             <th className="px-2 py-2 text-center font-medium">{t("detail.agentRoutes.columns.enabled")}</th>
             <th className="px-2 py-2 text-right font-medium">{t("detail.agentRoutes.columns.actions")}</th>
           </tr>
@@ -82,6 +83,9 @@ export function AgentRoutesTable({
                     {t("detail.agentRoutes.toolAllow.count", { count: r.tool_allow.length })}
                   </Badge>
                 )}
+              </td>
+              <td className="px-2 py-2">
+                {r.peer_id || <span className="text-muted-foreground">—</span>}
               </td>
               <td className="px-2 py-2 text-center">
                 <Switch

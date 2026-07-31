@@ -16,6 +16,26 @@ Single shared bot → multiple agents. Goclaw chooses the target `agent_id` per 
 
 Routes are evaluated by **`priority ASC, created_at ASC`** — first match wins. `priority` is operator-defined; lower number = higher precedence.
 
+### Peer-pinned routes (`peer_id`)
+
+Optional exact-match filter, in addition to the fields above. Column: `peer_id VARCHAR(128) NULL` (migration `000085`).
+
+- `null` (default) → matches any peer, same as before this field existed.
+- Set → the route only matches when the resolver's `peerID` for the inbound message equals this value **exactly** (case-sensitive string compare, no wildcard/prefix matching).
+- **peerID encoding** (same as sticky affinity, see below): DM (`chatID == senderID`) → `peerID = chat_id`; group/supergroup → composite `peerID = chat_id + ":" + sender_id`, so each user in a shared group can be pinned independently.
+- Max length 128 chars — POST/PATCH reject longer values with `422`.
+- Whitespace-only or empty string on write normalizes to `NULL` (i.e. "clear the pin"), same convention as `intent`.
+- Typical use: pin one Telegram DM to one per-tenant agent (e.g. affiliate-backend's `link_chat` flow), independent of the channel's other rule-based routes.
+
+**Mutation → affinity bust:** because the sticky-affinity layer (below) checks its cache BEFORE rule eval, changing a `peer_id` wouldn't take effect for that peer until the 1h affinity TTL expired. To avoid that lag, every CREATE/PATCH/DELETE on a route with a non-empty `peer_id` evicts that exact peer's `channel_routing_affinity` row as a side effect:
+
+- CREATE → busts the new route's `peer_id`.
+- PATCH → busts BOTH the pre-update `peer_id` (old binding, if any) and the post-update `peer_id` (new binding), since either side of the change may have a stale sticky row.
+- DELETE → busts the deleted route's `peer_id`.
+- Best-effort: affinity store errors are logged (`WARN`) and never fail the request — affinity is a cache, not the source of truth.
+
+**Index:** `idx_channel_agent_routes_channel_peer` is a **partial** index (`WHERE peer_id IS NOT NULL`) on `(channel_instance_id, peer_id)` — keeps the common case (no peer pinning) out of the index entirely.
+
 ### Per-route `tool_allow`
 
 Each route may narrow the MCP tool whitelist for messages routed through it.
@@ -222,7 +242,7 @@ Recommended use: disable in prod first deploy, smoke-test on beta with routes cr
 
 ## Related
 
-- Migration: `migrations/000081_*.sql`
+- Migration: `migrations/000081_*.sql` (routes table), `migrations/000082_*.sql` (sticky affinity), `migrations/000085_*.sql` (`peer_id` column + partial index)
 - Store: `internal/store/channel_agent_route_store.go`
 - Resolver: `internal/channels/routing/agent_route_resolver.go`
 - HTTP: `internal/http/channel_agent_routes.go`

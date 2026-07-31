@@ -59,6 +59,7 @@ export function AgentRouteDialog({
   const [inheritTools, setInheritTools] = useState(true);
   const [toolsText, setToolsText] = useState("");
   const [intent, setIntent] = useState("");
+  const [peerId, setPeerId] = useState("");
   const [targetKind, setTargetKind] = useState<AgentRouteTargetKind>("agent");
   const [submitting, setSubmitting] = useState(false);
 
@@ -75,6 +76,7 @@ export function AgentRouteDialog({
       setInheritTools(initial.tool_allow === null);
       setToolsText((initial.tool_allow ?? []).join("\n"));
       setIntent(initial.intent ?? "");
+      setPeerId(initial.peer_id ?? "");
       setTargetKind(initial.target_kind);
     } else {
       setName("");
@@ -87,6 +89,7 @@ export function AgentRouteDialog({
       setInheritTools(true);
       setToolsText("");
       setIntent("");
+      setPeerId("");
       setTargetKind("agent");
     }
   }, [open, initial, agents]);
@@ -111,6 +114,7 @@ export function AgentRouteDialog({
         is_enabled: isEnabled,
         tool_allow: tools,
         intent: intent.trim() === "" ? null : intent.trim(),
+        peer_id: peerId.trim() === "" ? null : peerId.trim(),
         target_kind: targetKind,
       };
       await onSubmit(payload);
@@ -226,6 +230,17 @@ export function AgentRouteDialog({
           <p className="text-xs text-muted-foreground">
             {t("detail.agentRoutes.fields.intentHint")}
           </p>
+          <div className="space-y-1">
+            <Label>{t("detail.agentRoutes.fields.routePeerId")}</Label>
+            <Input
+              className="text-base md:text-sm"
+              value={peerId}
+              onChange={(e) => setPeerId(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("detail.agentRoutes.fields.routePeerIdHint")}
+            </p>
+          </div>
           <div className="flex items-center justify-between pt-1">
             <Label className="font-normal">{t("detail.agentRoutes.fields.isEnabled")}</Label>
             <Switch checked={isEnabled} onCheckedChange={setIsEnabled} />

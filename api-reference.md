@@ -54,6 +54,7 @@ Route inbound messages on one channel instance to N backend agents using determi
 - `tool_allow`: `null` (inherit agent's full whitelist) | array of MCP tool names. Empty array collapses to `null`.
 - `priority`: lower = higher precedence. Default 100. Tie-break by `created_at ASC`.
 - `mention_required`: only matches when the inbound message @-mentions this channel's bot.
+- `peer_id`: optional string, max 128 chars. Exact match against the resolver's `peerID` (DM: `chat_id`; group/supergroup: composite `chat_id:sender_id`). `null`/empty (default) = matches any peer. Longer than 128 chars → `422`. CREATE/PATCH/DELETE on a route with a non-empty `peer_id` auto-busts that peer's sticky routing affinity so the change takes effect immediately instead of waiting out the 1h affinity TTL.
 
 All mutations invalidate the in-process route cache so subsequent inbound messages see the new rule within milliseconds.
 

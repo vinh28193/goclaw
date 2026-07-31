@@ -168,6 +168,8 @@
         "toolAllow": "Tool allow",
         "intent": "Intent label",
         "intentHint": "Optional. Set with a classifier label (e.g. 'billing', 'support'). Leave empty for rule-only matching.",
+        "routePeerId": "Peer ID",
+        "routePeerIdHint": "Optional. Pin this route to one exact chat (Telegram chat_id for DMs). Leave empty to match any peer.",
         "targetKind": "Target type"
       },
       "targetKind": {

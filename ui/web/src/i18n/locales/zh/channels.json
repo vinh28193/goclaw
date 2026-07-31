@@ -167,6 +167,8 @@
         "toolAllow": "工具白名单",
         "intent": "意图标签",
         "intentHint": "可选。配置分类器标签（如「billing」、「support」）。留空 = 仅按规则匹配。",
+        "routePeerId": "Peer ID",
+        "routePeerIdHint": "可选。将此路由固定到一个具体会话（私聊为 Telegram chat_id）。留空则匹配所有会话。",
         "targetKind": "目标类型"
       },
       "targetKind": {

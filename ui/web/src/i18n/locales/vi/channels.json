@@ -167,6 +167,8 @@
         "toolAllow": "Tool allow",
         "intent": "Intent",
         "intentHint": "Tùy chọn. Đặt label cho classifier (vd: 'billing', 'support'). Để trống = match theo rule như cũ.",
+        "routePeerId": "Peer ID",
+        "routePeerIdHint": "Tùy chọn. Ghim route vào đúng 1 chat (chat_id Telegram với DM). Bỏ trống để áp dụng mọi chat.",
         "targetKind": "Loại đích"
       },
       "targetKind": {

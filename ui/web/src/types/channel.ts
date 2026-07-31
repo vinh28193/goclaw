@@ -140,6 +140,7 @@ export interface ChannelAgentRoute {
   is_enabled: boolean;
   tool_allow: string[] | null;
   intent: string | null;
+  peer_id?: string | null;
   target_kind: AgentRouteTargetKind;
   created_at: string;
   updated_at: string;
@@ -155,6 +156,7 @@ export interface ChannelAgentRouteInput {
   is_enabled?: boolean;
   tool_allow?: string[] | null;
   intent?: string | null;
+  peer_id?: string | null;
   target_kind?: AgentRouteTargetKind;
 }
 
