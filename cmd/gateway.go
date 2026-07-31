@@ -538,6 +538,9 @@ func runGateway() {
 			pgStores.Tenants,
 			deps.routeResolver,
 		)
+		if pgStores.ChannelRoutingAffinity != nil {
+			routesH.SetAffinityStore(pgStores.ChannelRoutingAffinity)
+		}
 		server.SetChannelAgentRoutesHandler(routesH)
 	}
 

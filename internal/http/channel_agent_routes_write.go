@@ -1,9 +1,13 @@
 package http
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -41,6 +45,10 @@ func (h *ChannelAgentRoutesHandler) handleCreate(w http.ResponseWriter, r *http.
 		writeError(w, http.StatusUnprocessableEntity, protocol.ErrInvalidRequest, i18n.T(locale, i18n.MsgInvalidRequest, "target_kind must be agent or team"))
 		return
 	}
+	if body.PeerID != nil && len(*body.PeerID) > 128 {
+		writeError(w, http.StatusUnprocessableEntity, protocol.ErrInvalidRequest, i18n.T(locale, i18n.MsgInvalidRequest, "peer_id must be at most 128 characters"))
+		return
+	}
 
 	// Default target_kind = "agent" for legacy clients that don't send it.
 	targetKind := store.RouteTargetAgent
@@ -70,6 +78,7 @@ func (h *ChannelAgentRoutesHandler) handleCreate(w http.ResponseWriter, r *http.
 		IsEnabled:         ptrBoolOr(body.IsEnabled, true),
 		ToolAllow:         normalizeToolAllow(body.ToolAllow),
 		Intent:            body.Intent,
+		PeerID:            normalizePeerID(body.PeerID),
 		TargetKind:        targetKind,
 	}
 
@@ -80,6 +89,7 @@ func (h *ChannelAgentRoutesHandler) handleCreate(w http.ResponseWriter, r *http.
 	}
 
 	h.invalidateCache(inst.ID)
+	h.bustAffinity(r.Context(), inst.ID, row.PeerID)
 	writeJSON(w, http.StatusCreated, toResponse(row))
 }
 
@@ -101,6 +111,10 @@ func (h *ChannelAgentRoutesHandler) handleUpdate(w http.ResponseWriter, r *http.
 		writeError(w, http.StatusNotFound, protocol.ErrNotFound, i18n.T(locale, i18n.MsgNotFound, "route", rid.String()))
 		return
 	}
+	// Snapshot the pre-update peer_id now — some store implementations return
+	// a row that gets mutated in place by Update, so reading existing.PeerID
+	// after the update call would silently observe the NEW value.
+	oldPeerID := existing.PeerID
 
 	var body agentRouteRequest
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&body); err != nil {
@@ -160,6 +174,18 @@ func (h *ChannelAgentRoutesHandler) handleUpdate(w http.ResponseWriter, r *http.
 		}
 		updates["target_kind"] = *body.TargetKind
 	}
+	if body.PeerID != nil {
+		if len(*body.PeerID) > 128 {
+			writeError(w, http.StatusUnprocessableEntity, protocol.ErrInvalidRequest, i18n.T(locale, i18n.MsgInvalidRequest, "peer_id must be at most 128 characters"))
+			return
+		}
+		// Empty string from operator means "clear peer pinning" — store as NULL.
+		if strings.TrimSpace(*body.PeerID) == "" {
+			updates["peer_id"] = nil
+		} else {
+			updates["peer_id"] = strings.TrimSpace(*body.PeerID)
+		}
+	}
 
 	if len(updates) == 0 {
 		writeError(w, http.StatusBadRequest, protocol.ErrInvalidRequest, i18n.T(locale, i18n.MsgInvalidUpdates))
@@ -173,6 +199,8 @@ func (h *ChannelAgentRoutesHandler) handleUpdate(w http.ResponseWriter, r *http.
 	}
 
 	h.invalidateCache(inst.ID)
+	h.bustAffinity(r.Context(), inst.ID, oldPeerID)
+	h.bustAffinity(r.Context(), inst.ID, normalizePeerID(body.PeerID))
 	refreshed, err := h.routes.Get(r.Context(), rid)
 	if err != nil || refreshed == nil {
 		// Update succeeded but read-back failed — return what we know.
@@ -212,6 +240,7 @@ func (h *ChannelAgentRoutesHandler) handleDelete(w http.ResponseWriter, r *http.
 	}
 
 	h.invalidateCache(inst.ID)
+	h.bustAffinity(r.Context(), inst.ID, existing.PeerID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -221,6 +250,33 @@ func (h *ChannelAgentRoutesHandler) invalidateCache(channelInstanceID uuid.UUID)
 		return
 	}
 	h.invalidator.Invalidate(channelInstanceID)
+}
+
+// bustAffinity best-effort deletes the sticky binding for a peer so a freshly
+// mutated peer-pinned route is honored immediately (resolver checks affinity
+// BEFORE rules). Errors are logged, never surfaced — affinity is a cache.
+func (h *ChannelAgentRoutesHandler) bustAffinity(ctx context.Context, channelInstanceID uuid.UUID, peerID *string) {
+	if h.affinity == nil || peerID == nil || *peerID == "" {
+		return
+	}
+	if err := h.affinity.Delete(ctx, channelInstanceID, *peerID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		slog.Warn("channel_agent_routes: affinity bust failed",
+			"channel_instance_id", channelInstanceID, "peer_id", *peerID, "err", err)
+	}
+}
+
+// normalizePeerID trims whitespace and collapses an empty/whitespace-only
+// value to nil so the store persists NULL rather than an empty string for
+// "no peer pinning".
+func normalizePeerID(p *string) *string {
+	if p == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*p)
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // mediaTypePresent reports whether the JSON body carried media_type — needed
@@ -257,4 +313,3 @@ func ptrIntOr(p *int, def int) int {
 	}
 	return *p
 }
-

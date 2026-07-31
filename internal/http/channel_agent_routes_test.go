@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -96,6 +98,13 @@ func (s *fakeRouteStore) Update(_ context.Context, id uuid.UUID, updates map[str
 			r.ToolAllow = p
 		}
 	}
+	if v, ok := updates["peer_id"]; ok {
+		if v == nil {
+			r.PeerID = nil
+		} else if s, ok := v.(string); ok {
+			r.PeerID = &s
+		}
+	}
 	return nil
 }
 
@@ -147,6 +156,65 @@ func (f *fakeAgentStoreRoutes) GetByID(_ context.Context, id uuid.UUID) (*store.
 		return nil, sql.ErrNoRows
 	}
 	return a, nil
+}
+
+// fakeAffinityStore is a minimal in-memory ChannelRoutingAffinityStore for
+// asserting the handler busts sticky bindings on peer-pinned route mutation.
+type fakeAffinityStore struct {
+	mu       sync.Mutex
+	bindings map[string]*store.ChannelRoutingAffinityData
+	deleted  []string // recorded "channelInstanceID|peerID" Delete calls
+}
+
+func newFakeAffinityStore() *fakeAffinityStore {
+	return &fakeAffinityStore{bindings: map[string]*store.ChannelRoutingAffinityData{}}
+}
+
+func affinityKey(channelInstanceID uuid.UUID, peerID string) string {
+	return channelInstanceID.String() + "|" + peerID
+}
+
+func (f *fakeAffinityStore) seed(channelInstanceID uuid.UUID, peerID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.bindings[affinityKey(channelInstanceID, peerID)] = &store.ChannelRoutingAffinityData{
+		ChannelInstanceID: channelInstanceID,
+		PeerID:            peerID,
+	}
+}
+
+func (f *fakeAffinityStore) Get(_ context.Context, channelInstanceID uuid.UUID, peerID string) (*store.ChannelRoutingAffinityData, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b, ok := f.bindings[affinityKey(channelInstanceID, peerID)]
+	if !ok {
+		return nil, sql.ErrNoRows
+	}
+	return b, nil
+}
+
+func (f *fakeAffinityStore) Upsert(_ context.Context, row *store.ChannelRoutingAffinityData) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.bindings[affinityKey(row.ChannelInstanceID, row.PeerID)] = row
+	return nil
+}
+
+func (f *fakeAffinityStore) Delete(_ context.Context, channelInstanceID uuid.UUID, peerID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	key := affinityKey(channelInstanceID, peerID)
+	f.deleted = append(f.deleted, key)
+	delete(f.bindings, key)
+	return nil
+}
+
+func (f *fakeAffinityStore) DeletePeerForChannel(_ context.Context, channelInstanceID uuid.UUID) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeAffinityStore) DeleteExpired(_ context.Context, now time.Time) (int, error) {
+	return 0, nil
 }
 
 // recordingInvalidator captures Invalidate calls so tests assert cache flips.
@@ -469,6 +537,179 @@ func TestChannelAgentRoutes_GetUnknown(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
+// ---- peer_id + sticky-affinity bust tests ----
+
+func TestChannelAgentRoutes_CreateWithPeerID(t *testing.T) {
+	h, routes, _, _, instID, agentID, token := buildRouteHandlerEnv(t)
+	mux := mountRouteHandler(h)
+
+	body := fmt.Sprintf(`{"agent_id":%q,"peer_kind":"direct","peer_id":"12345"}`, agentID.String())
+	req := bearer(httptest.NewRequest(http.MethodPost, "/v1/channels/instances/"+instID.String()+"/agent-routes", bytes.NewBufferString(body)), token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
+	}
+	var resp agentRouteResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.PeerID == nil || *resp.PeerID != "12345" {
+		t.Fatalf("peer_id = %v, want 12345", resp.PeerID)
+	}
+	var stored *store.ChannelAgentRouteData
+	for _, r := range routes.rows {
+		stored = r
+	}
+	if stored == nil || stored.PeerID == nil || *stored.PeerID != "12345" {
+		t.Fatalf("stored row missing peer_id: %+v", stored)
+	}
+}
+
+func TestChannelAgentRoutes_RejectsTooLongPeerID(t *testing.T) {
+	h, _, _, _, instID, agentID, token := buildRouteHandlerEnv(t)
+	mux := mountRouteHandler(h)
+
+	longPeer := strings.Repeat("9", 129)
+	body := fmt.Sprintf(`{"agent_id":%q,"peer_kind":"direct","peer_id":%q}`, agentID.String(), longPeer)
+	req := bearer(httptest.NewRequest(http.MethodPost, "/v1/channels/instances/"+instID.String()+"/agent-routes", bytes.NewBufferString(body)), token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want 422; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestChannelAgentRoutes_CreateBustsExistingAffinity(t *testing.T) {
+	h, _, _, _, instID, agentID, token := buildRouteHandlerEnv(t)
+	affinity := newFakeAffinityStore()
+	affinity.seed(instID, "12345")
+	h.SetAffinityStore(affinity)
+	mux := mountRouteHandler(h)
+
+	body := fmt.Sprintf(`{"agent_id":%q,"peer_kind":"direct","peer_id":"12345"}`, agentID.String())
+	req := bearer(httptest.NewRequest(http.MethodPost, "/v1/channels/instances/"+instID.String()+"/agent-routes", bytes.NewBufferString(body)), token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(affinity.deleted) != 1 || affinity.deleted[0] != affinityKey(instID, "12345") {
+		t.Fatalf("expected affinity Delete for (%s,12345); got %v", instID, affinity.deleted)
+	}
+	if _, err := affinity.Get(context.Background(), instID, "12345"); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("binding should have been evicted from the fake store")
+	}
+}
+
+func TestChannelAgentRoutes_UpdateClearsPeerIDOnEmptyString(t *testing.T) {
+	h, routes, _, tenantID, instID, agentID, token := buildRouteHandlerEnv(t)
+	mux := mountRouteHandler(h)
+
+	rid := uuid.New()
+	existingPeer := "old-peer"
+	routes.rows[rid] = &store.ChannelAgentRouteData{
+		BaseModel: store.BaseModel{ID: rid}, TenantID: tenantID,
+		ChannelInstanceID: instID, AgentID: agentID, PeerKind: "direct", IsEnabled: true,
+		PeerID: &existingPeer,
+	}
+
+	body := `{"peer_id":""}`
+	req := bearer(httptest.NewRequest(http.MethodPatch, "/v1/channels/instances/"+instID.String()+"/agent-routes/"+rid.String(), bytes.NewBufferString(body)), token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	var resp agentRouteResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.PeerID != nil {
+		t.Fatalf("peer_id should be cleared; got %v", *resp.PeerID)
+	}
+	if routes.rows[rid].PeerID != nil {
+		t.Fatalf("stored row peer_id should be nil")
+	}
+}
+
+func TestChannelAgentRoutes_UpdateBustsOldAndNewPeerAffinity(t *testing.T) {
+	h, routes, _, tenantID, instID, agentID, token := buildRouteHandlerEnv(t)
+	affinity := newFakeAffinityStore()
+	affinity.seed(instID, "old-peer")
+	affinity.seed(instID, "new-peer")
+	h.SetAffinityStore(affinity)
+	mux := mountRouteHandler(h)
+
+	rid := uuid.New()
+	existingPeer := "old-peer"
+	routes.rows[rid] = &store.ChannelAgentRouteData{
+		BaseModel: store.BaseModel{ID: rid}, TenantID: tenantID,
+		ChannelInstanceID: instID, AgentID: agentID, PeerKind: "direct", IsEnabled: true,
+		PeerID: &existingPeer,
+	}
+
+	body := `{"peer_id":"new-peer"}`
+	req := bearer(httptest.NewRequest(http.MethodPatch, "/v1/channels/instances/"+instID.String()+"/agent-routes/"+rid.String(), bytes.NewBufferString(body)), token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	wantOld := affinityKey(instID, "old-peer")
+	wantNew := affinityKey(instID, "new-peer")
+	if len(affinity.deleted) != 2 || !((affinity.deleted[0] == wantOld && affinity.deleted[1] == wantNew) || (affinity.deleted[0] == wantNew && affinity.deleted[1] == wantOld)) {
+		t.Fatalf("expected bust of both old and new peer affinity; got %v", affinity.deleted)
+	}
+}
+
+func TestChannelAgentRoutes_DeleteBustsAffinity(t *testing.T) {
+	h, routes, _, tenantID, instID, agentID, token := buildRouteHandlerEnv(t)
+	affinity := newFakeAffinityStore()
+	affinity.seed(instID, "dead-peer")
+	h.SetAffinityStore(affinity)
+	mux := mountRouteHandler(h)
+
+	rid := uuid.New()
+	peer := "dead-peer"
+	routes.rows[rid] = &store.ChannelAgentRouteData{
+		BaseModel: store.BaseModel{ID: rid}, TenantID: tenantID,
+		ChannelInstanceID: instID, AgentID: agentID, PeerKind: "direct", IsEnabled: true,
+		PeerID: &peer,
+	}
+
+	req := bearer(httptest.NewRequest(http.MethodDelete, "/v1/channels/instances/"+instID.String()+"/agent-routes/"+rid.String(), nil), token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(affinity.deleted) != 1 || affinity.deleted[0] != affinityKey(instID, "dead-peer") {
+		t.Fatalf("expected affinity Delete for dead-peer; got %v", affinity.deleted)
+	}
+}
+
+func TestChannelAgentRoutes_NilAffinityStoreIsNoop(t *testing.T) {
+	h, _, _, _, instID, agentID, token := buildRouteHandlerEnv(t)
+	mux := mountRouteHandler(h)
+
+	// No SetAffinityStore call — must not panic.
+	body := fmt.Sprintf(`{"agent_id":%q,"peer_kind":"direct","peer_id":"12345"}`, agentID.String())
+	req := bearer(httptest.NewRequest(http.MethodPost, "/v1/channels/instances/"+instID.String()+"/agent-routes", bytes.NewBufferString(body)), token)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body=%s", rec.Code, rec.Body.String())
 	}
 }
 

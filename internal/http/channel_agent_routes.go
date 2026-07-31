@@ -29,6 +29,7 @@ type ChannelAgentRoutesHandler struct {
 	channels    store.ChannelInstanceStore
 	agents      store.AgentStore
 	invalidator RouteCacheInvalidator
+	affinity    store.ChannelRoutingAffinityStore
 }
 
 // NewChannelAgentRoutesHandler builds the handler. `invalidator` may be nil —
@@ -51,6 +52,13 @@ func NewChannelAgentRoutesHandler(
 		agents:      agents,
 		invalidator: invalidator,
 	}
+}
+
+// SetAffinityStore wires sticky-binding eviction: route mutations that pin a
+// peer_id evict that peer's affinity row so the new route takes effect
+// immediately instead of after the 1h affinity TTL. Nil-safe (no-op).
+func (h *ChannelAgentRoutesHandler) SetAffinityStore(s store.ChannelRoutingAffinityStore) {
+	h.affinity = s
 }
 
 // RegisterRoutes mounts the 5 CRUD endpoints under
@@ -85,8 +93,9 @@ type agentRouteRequest struct {
 	MentionRequired *bool      `json:"mention_required"`
 	Priority        *int       `json:"priority"`
 	IsEnabled       *bool      `json:"is_enabled"`
-	ToolAllow       *[]string  `json:"tool_allow"` // nil = inherit
-	Intent          *string    `json:"intent"`     // Path 1: classifier label; null = rule-only
+	ToolAllow       *[]string  `json:"tool_allow"`  // nil = inherit
+	Intent          *string    `json:"intent"`      // Path 1: classifier label; null = rule-only
+	PeerID          *string    `json:"peer_id"`     // peer-pinned routing; null/empty = any peer
 	TargetKind      *string    `json:"target_kind"` // Path 4: "agent" (default) | "team"
 }
 
@@ -103,6 +112,7 @@ type agentRouteResponse struct {
 	IsEnabled         bool      `json:"is_enabled"`
 	ToolAllow         *[]string `json:"tool_allow"`
 	Intent            *string   `json:"intent"`
+	PeerID            *string   `json:"peer_id"`
 	TargetKind        string    `json:"target_kind"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
@@ -126,6 +136,7 @@ func toResponse(d *store.ChannelAgentRouteData) agentRouteResponse {
 		IsEnabled:         d.IsEnabled,
 		ToolAllow:         d.ToolAllow,
 		Intent:            d.Intent,
+		PeerID:            d.PeerID,
 		TargetKind:        kind,
 		CreatedAt:         d.CreatedAt,
 		UpdatedAt:         d.UpdatedAt,
