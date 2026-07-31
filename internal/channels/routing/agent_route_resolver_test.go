@@ -914,6 +914,48 @@ func TestResolver_InvalidateClearsEntry(t *testing.T) {
 	}
 }
 
+// Peer-pinned routing: a route with non-nil PeerID only matches its exact
+// peer. peerID="111" hits the pinned route (agent X, priority 10, wins over
+// the lower-priority catch-all); peerID="222" skips the pinned route and
+// falls through to the catch-all (agent Y).
+func TestResolvePeerIDExactMatch(t *testing.T) {
+	chID := uuid.Must(uuid.NewV7())
+	agentX, agentY := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
+	pinned := newRoute(agentX, "direct", nil, false, 10, true, nil)
+	pinned.PeerID = ptrStr("111")
+	catchAll := newRoute(agentY, "direct", nil, false, 100, true, nil)
+	fs := &fakeRouteStore{routes: map[uuid.UUID][]store.ChannelAgentRouteData{
+		chID: {pinned, catchAll},
+	}}
+	r := NewAgentRouteResolver(fs, 0)
+
+	if a, _, m, _ := r.Resolve(context.Background(), chID, "111", "", "direct", MediaKindText, false); !m || a != agentX {
+		t.Fatalf("peer 111 should match pinned route: agent=%v matched=%v", a, m)
+	}
+	if a, _, m, _ := r.Resolve(context.Background(), chID, "222", "", "direct", MediaKindText, false); !m || a != agentY {
+		t.Fatalf("peer 222 should skip pinned route and fall through to catch-all: agent=%v matched=%v", a, m)
+	}
+}
+
+// Peer-pinned routes still respect the other filters — a peer_id match alone
+// isn't enough; peer_kind (and the other signals) must also line up.
+func TestResolvePeerIDStillAppliesOtherFilters(t *testing.T) {
+	chID := uuid.Must(uuid.NewV7())
+	agentX := uuid.Must(uuid.NewV7())
+	pinned := newRoute(agentX, "group", nil, false, 10, true, nil) // requires peer_kind=group
+	pinned.PeerID = ptrStr("111")
+	fs := &fakeRouteStore{routes: map[uuid.UUID][]store.ChannelAgentRouteData{
+		chID: {pinned},
+	}}
+	r := NewAgentRouteResolver(fs, 0)
+
+	// Exact peer_id match but peer_kind mismatch ("direct" vs route's "group")
+	// must still fail — peer_id is an additional filter, not a bypass.
+	if _, _, m, _ := r.Resolve(context.Background(), chID, "111", "", "direct", MediaKindText, false); m {
+		t.Fatal("peer_id match must not bypass peer_kind filter")
+	}
+}
+
 func TestResolver_StoreErrorBubblesUp(t *testing.T) {
 	chID := uuid.Must(uuid.NewV7())
 	fs := &fakeRouteStore{

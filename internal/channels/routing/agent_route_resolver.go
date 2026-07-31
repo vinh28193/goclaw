@@ -234,6 +234,10 @@ func (r *AgentRouteResolver) ResolveDecision(
 		if route.PeerKind != peerKind {
 			continue
 		}
+		// Peer-pinned routing: non-nil PeerID only matches its exact peer.
+		if route.PeerID != nil && *route.PeerID != peerID {
+			continue
+		}
 		if route.MediaType != nil && *route.MediaType != mediaKind {
 			continue
 		}
