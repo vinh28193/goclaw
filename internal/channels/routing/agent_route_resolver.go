@@ -199,11 +199,36 @@ func (r *AgentRouteResolver) ResolveDecision(
 	// for the Path 4 follow-up to store target_kind alongside agent_id.
 	if r.affinityStore != nil && peerID != "" {
 		if bound, err := r.affinityStore.Get(ctx, channelInstanceID, peerID); err == nil && bound != nil {
-			var allow []string
-			if bound.ToolAllow != nil {
-				allow = append(allow, (*bound.ToolAllow)...)
+			// Stale-cache-window guard: a peer-pinned route for this exact
+			// peerID always takes precedence over a sticky binding. Without
+			// this check, a binding created moments before an operator
+			// pinned (or repinned) the peer — or created from a stale
+			// per-node route cache right after link — would silently mask
+			// the pin for up to DefaultAffinityTTL (1h) in multi-node
+			// deployments. Revalidate against the current pinned route (if
+			// any) and only honor the shortcut when they agree.
+			stale := false
+			if routes, routesErr := r.loadRoutes(ctx, channelInstanceID); routesErr == nil {
+				for i := range routes {
+					route := &routes[i]
+					if !route.IsEnabled || route.PeerID == nil || *route.PeerID != peerID {
+						continue
+					}
+					stale = route.AgentID != bound.AgentID || route.TargetKind == store.RouteTargetTeam
+					break
+				}
 			}
-			return Decision{TargetID: bound.AgentID, TargetKind: store.RouteTargetAgent, ToolAllow: allow}, true, nil
+			// On route-load error, keep legacy behavior: return the binding
+			// rather than blocking traffic on a resolver/store failure.
+			if !stale {
+				var allow []string
+				if bound.ToolAllow != nil {
+					allow = append(allow, (*bound.ToolAllow)...)
+				}
+				return Decision{TargetID: bound.AgentID, TargetKind: store.RouteTargetAgent, ToolAllow: allow}, true, nil
+			}
+			// Stale binding — fall through to normal rule eval below, which
+			// will match the pinned route and upsert a fresh binding.
 		}
 		// On Get error we silently fall through to rule eval — sticky is a perf
 		// hint, never a correctness gate.
@@ -226,6 +251,10 @@ func (r *AgentRouteResolver) ResolveDecision(
 		}
 	}
 
+	// TODO(scale): this is a per-message linear scan over the whole channel
+	// instance's route list; idx_channel_agent_routes_channel_peer supports an
+	// indexed (channel_instance_id, peer_id) short-circuit lookup if N grows
+	// large enough for the scan to matter.
 	for i := range routes {
 		route := &routes[i]
 		if !route.IsEnabled {

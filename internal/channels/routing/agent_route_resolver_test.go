@@ -803,6 +803,86 @@ func TestResolver_StickyUpsertFailureDoesNotBlock(t *testing.T) {
 	}
 }
 
+// A peer-pinned route disagreeing with a sticky binding means the binding is
+// stale (e.g. created from a stale per-node route cache right before/after
+// the peer was pinned to a different agent). The pinned route must win —
+// Resolve falls through to rule eval and re-upserts a fresh binding.
+func TestAffinityOverriddenByPeerPinnedRoute(t *testing.T) {
+	chID := uuid.Must(uuid.NewV7())
+	agentA, agentB := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
+	pinned := newRoute(agentB, "direct", nil, false, 10, true, nil)
+	pinned.PeerID = new("111")
+	fs := &fakeRouteStore{routes: map[uuid.UUID][]store.ChannelAgentRouteData{
+		chID: {pinned},
+	}}
+	r := NewAgentRouteResolver(fs, time.Hour)
+	aff := newFakeAffinityStore()
+	r.SetAffinityStore(aff, time.Hour)
+
+	// Seed a stale binding to agent A — simulates a binding created before the
+	// peer got (re)pinned to agent B.
+	if err := aff.Upsert(context.Background(), &store.ChannelRoutingAffinityData{
+		ChannelInstanceID: chID,
+		PeerID:            "111",
+		AgentID:           agentA,
+		ExpiresAt:         time.Now().Add(time.Hour),
+	}); err != nil {
+		t.Fatalf("seed affinity: %v", err)
+	}
+	seedUpserts := aff.upsertCalls
+
+	a, _, m, err := r.Resolve(context.Background(), chID, "111", "", "direct", MediaKindText, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if !m || a != agentB {
+		t.Fatalf("peer-pinned route must override stale affinity: agent=%v matched=%v", a, m)
+	}
+	if aff.upsertCalls != seedUpserts+1 {
+		t.Fatalf("expected a re-upsert rebinding the peer to agentB; upsertCalls=%d (seed %d)", aff.upsertCalls, seedUpserts)
+	}
+	rebound, err := aff.Get(context.Background(), chID, "111")
+	if err != nil || rebound.AgentID != agentB {
+		t.Fatalf("affinity store should now be bound to agentB; got %v err=%v", rebound, err)
+	}
+}
+
+// When the pinned route agrees with the sticky binding, Resolve keeps serving
+// the binding directly (short-circuit), and must NOT trigger an extra Upsert.
+func TestAffinityKeptWhenPinnedRouteAgrees(t *testing.T) {
+	chID := uuid.Must(uuid.NewV7())
+	agentA := uuid.Must(uuid.NewV7())
+	pinned := newRoute(agentA, "direct", nil, false, 10, true, nil)
+	pinned.PeerID = new("111")
+	fs := &fakeRouteStore{routes: map[uuid.UUID][]store.ChannelAgentRouteData{
+		chID: {pinned},
+	}}
+	r := NewAgentRouteResolver(fs, time.Hour)
+	aff := newFakeAffinityStore()
+	r.SetAffinityStore(aff, time.Hour)
+
+	if err := aff.Upsert(context.Background(), &store.ChannelRoutingAffinityData{
+		ChannelInstanceID: chID,
+		PeerID:            "111",
+		AgentID:           agentA,
+		ExpiresAt:         time.Now().Add(time.Hour),
+	}); err != nil {
+		t.Fatalf("seed affinity: %v", err)
+	}
+	seedUpserts := aff.upsertCalls
+
+	a, _, m, err := r.Resolve(context.Background(), chID, "111", "", "direct", MediaKindText, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if !m || a != agentA {
+		t.Fatalf("agreeing pinned route should resolve via the binding: agent=%v matched=%v", a, m)
+	}
+	if aff.upsertCalls != seedUpserts {
+		t.Fatalf("agreeing binding must short-circuit without re-upserting; upsertCalls=%d (seed %d)", aff.upsertCalls, seedUpserts)
+	}
+}
+
 // fakeInvalidatePublisher captures Publish calls so tests assert that
 // Invalidate fans out to peers in addition to evicting the local cache.
 type fakeInvalidatePublisher struct {

@@ -26,6 +26,7 @@ Optional exact-match filter, in addition to the fields above. Column: `peer_id V
 - Max length 128 chars — POST/PATCH reject longer values with `422`.
 - Whitespace-only or empty string on write normalizes to `NULL` (i.e. "clear the pin"), same convention as `intent`.
 - Typical use: pin one Telegram DM to one per-tenant agent (e.g. affiliate-backend's `link_chat` flow), independent of the channel's other rule-based routes.
+- **Precedence over sticky affinity:** a peer-pinned route always wins over an existing sticky binding (below) for that exact peer. Before honoring the affinity shortcut, the resolver revalidates against the current pinned route for the peer; if they disagree (different agent, or the route now targets a team), the binding is treated as stale and the resolver falls through to rule eval, which re-matches the pin and upserts a fresh binding. This closes the multi-node stale-cache window where a binding created just before/after a (re)pin would otherwise mask the pin for up to the 1h affinity TTL.
 
 **Mutation → affinity bust:** because the sticky-affinity layer (below) checks its cache BEFORE rule eval, changing a `peer_id` wouldn't take effect for that peer until the 1h affinity TTL expired. To avoid that lag, every CREATE/PATCH/DELETE on a route with a non-empty `peer_id` evicts that exact peer's `channel_routing_affinity` row as a side effect:
 

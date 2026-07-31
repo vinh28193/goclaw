@@ -347,6 +347,16 @@ func TestChannelAgentRoutes_Integration_PeerIDMatching(t *testing.T) {
 	if catchAllRoute.PeerID != nil {
 		t.Fatalf("catch-all route should have nil peer_id, got %v", catchAllRoute.PeerID)
 	}
+
+	// Drive the resolver end-to-end: the pinned peer must resolve to the
+	// pinned agent, and any other peer must fall through to the catch-all.
+	resolver := routing.NewAgentRouteResolver(routeStore, 0)
+	if a, _, m, err := resolver.Resolve(ctx, channelID, "12345", "", "direct", routing.MediaKindText, false); err != nil || !m || a != peerPinnedAgent {
+		t.Fatalf("peer 12345 should resolve to the pinned agent: agent=%v matched=%v err=%v", a, m, err)
+	}
+	if a, _, m, err := resolver.Resolve(ctx, channelID, "other-peer", "", "direct", routing.MediaKindText, false); err != nil || !m || a != defaultAgentID {
+		t.Fatalf("other peer should fall through to the catch-all/default agent: agent=%v matched=%v err=%v", a, m, err)
+	}
 }
 
 // Sanity guard so the import doesn't drift if the test ever stops using ctx.
