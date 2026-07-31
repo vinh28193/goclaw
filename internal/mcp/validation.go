@@ -2,12 +2,26 @@ package mcp
 
 import (
 	"fmt"
+	"log/slog"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/nextlevelbuilder/goclaw/internal/security"
 )
+
+// allowPrivateMCPURLsFn reports whether the operator has opted in to
+// permitting private / loopback / internal-hostname MCP server URLs via
+// GOCLAW_ALLOW_PRIVATE_MCP_URLS — for self-hosted deployments where the MCP
+// backend runs on the same box or compose network (mirrors
+// GOCLAW_ALLOW_PRIVATE_PROVIDER_URLS in internal/http/providers.go).
+// Evaluated once at first call so tests can swap the variable.
+var allowPrivateMCPURLsFn = sync.OnceValue(func() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("GOCLAW_ALLOW_PRIVATE_MCP_URLS")))
+	return v == "1" || v == "true" || v == "yes"
+})
 
 // Allowed commands for stdio transport (basename only).
 // This is a restrictive allowlist — only well-known runtimes are permitted.
@@ -113,6 +127,22 @@ func ValidateArgs(args []string) error {
 // This provides DNS rebinding protection via IP pinning.
 func ValidateURL(rawURL string) error {
 	if rawURL == "" {
+		return nil
+	}
+
+	// Operator opt-in for private-network MCP URLs (self-hosted backend on
+	// the same box/compose network). Scheme check still applies.
+	if allowPrivateMCPURLsFn() {
+		u, err := url.Parse(rawURL)
+		if err != nil {
+			return fmt.Errorf("URL validation failed: %w", err)
+		}
+		switch u.Scheme {
+		case "http", "https":
+		default:
+			return fmt.Errorf("URL validation failed: MCP URL must use http or https scheme, got %q", u.Scheme)
+		}
+		slog.Warn("security.mcp_url.private_allowed", "host", u.Hostname())
 		return nil
 	}
 

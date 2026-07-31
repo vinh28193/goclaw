@@ -265,3 +265,27 @@ func TestValidateHeaders_EnvVarCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateURL_PrivateAllowedByOptIn(t *testing.T) {
+	// Simulate GOCLAW_ALLOW_PRIVATE_MCP_URLS=true (self-hosted compose network).
+	old := allowPrivateMCPURLsFn
+	allowPrivateMCPURLsFn = func() bool { return true }
+	defer func() { allowPrivateMCPURLsFn = old }()
+
+	security.SetAllowLoopbackForTest(false)
+	defer security.SetAllowLoopbackForTest(true)
+
+	for _, u := range []string{
+		"http://host.docker.internal:8000/mcp",
+		"http://192.168.1.10:8000/mcp",
+		"http://api:8000/mcp",
+	} {
+		if err := ValidateURL(u); err != nil {
+			t.Errorf("ValidateURL(%q) with opt-in = %v, want nil", u, err)
+		}
+	}
+	// Non-http(s) schemes stay rejected even with the opt-in.
+	if err := ValidateURL("file:///etc/passwd"); err == nil {
+		t.Errorf("ValidateURL(file://) with opt-in = nil, want error")
+	}
+}
