@@ -104,6 +104,19 @@ export function AgentRouteDialog({
             .split("\n")
             .map((s) => s.trim())
             .filter(Boolean);
+      // peer_id: PATCH treats an omitted/null field as "don't touch" — only an
+      // explicit "" clears the pin (see channel_agent_routes_write.go
+      // normalizePeerID, used on both create and update). Always sending the
+      // trimmed string (never coercing "" to null) is therefore safe and
+      // correct for both create and update.
+      //
+      // intent: PATCH has the identical "" = clear contract (handleUpdate),
+      // but create does NOT normalize — an explicit "" would be stored as a
+      // literal empty string rather than NULL. So on create we still coerce
+      // blank input to null; on update we send the trimmed string as-is so
+      // clearing an existing intent actually works.
+      const isEdit = initial !== null;
+      const trimmedIntent = intent.trim();
       const payload: ChannelAgentRouteInput = {
         name: name.trim(),
         agent_id: agentID,
@@ -113,8 +126,8 @@ export function AgentRouteDialog({
         priority,
         is_enabled: isEnabled,
         tool_allow: tools,
-        intent: intent.trim() === "" ? null : intent.trim(),
-        peer_id: peerId.trim() === "" ? null : peerId.trim(),
+        intent: isEdit ? trimmedIntent : (trimmedIntent === "" ? null : trimmedIntent),
+        peer_id: peerId.trim(),
         target_kind: targetKind,
       };
       await onSubmit(payload);
