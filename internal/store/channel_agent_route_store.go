@@ -36,6 +36,9 @@ type ChannelAgentRouteData struct {
 	// field is reinterpreted as the agent_teams.id to dispatch via
 	// internal/orchestration. Legacy rows default to "agent".
 	TargetKind string `json:"target_kind" db:"target_kind"`
+	// PeerID (peer-pinned routing): if set, route only matches when the
+	// resolver's peerID equals this value exactly (DM chat_id). NULL = any peer.
+	PeerID *string `json:"peer_id,omitempty" db:"peer_id"`
 }
 
 // Route target kind constants.

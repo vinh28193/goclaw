@@ -24,7 +24,7 @@ func NewPGChannelAgentRouteStore(db *sql.DB) *PGChannelAgentRouteStore {
 
 const channelAgentRouteSelectCols = `id, tenant_id, channel_instance_id, agent_id, name,
  peer_kind, media_type, mention_required, priority, is_enabled, tool_allow,
- intent, target_kind, created_at, updated_at`
+ intent, target_kind, peer_id, created_at, updated_at`
 
 // Create derives tenant_id from the parent channel_instance row (single source of truth).
 // If the caller passes a tenant context or sets r.TenantID, the values must match.
@@ -81,11 +81,11 @@ func (s *PGChannelAgentRouteStore) Create(ctx context.Context, r *store.ChannelA
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO channel_agent_routes (id, tenant_id, channel_instance_id, agent_id, name,
 		 peer_kind, media_type, mention_required, priority, is_enabled, tool_allow,
-		 intent, target_kind, created_at, updated_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+		 intent, target_kind, peer_id, created_at, updated_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
 		r.ID, r.TenantID, r.ChannelInstanceID, r.AgentID, r.Name,
 		r.PeerKind, r.MediaType, r.MentionRequired, r.Priority, r.IsEnabled, toolAllowJSON,
-		r.Intent, r.TargetKind, now, now,
+		r.Intent, r.TargetKind, r.PeerID, now, now,
 	)
 	return err
 }
@@ -197,17 +197,18 @@ func (s *PGChannelAgentRouteStore) ListByTenant(ctx context.Context) ([]store.Ch
 
 func scanRoute(row *sql.Row) (*store.ChannelAgentRouteData, error) {
 	var r store.ChannelAgentRouteData
-	var mediaType, intent *string
+	var mediaType, intent, peerID *string
 	var toolAllowRaw []byte
 	if err := row.Scan(
 		&r.ID, &r.TenantID, &r.ChannelInstanceID, &r.AgentID, &r.Name,
 		&r.PeerKind, &mediaType, &r.MentionRequired, &r.Priority, &r.IsEnabled, &toolAllowRaw,
-		&intent, &r.TargetKind, &r.CreatedAt, &r.UpdatedAt,
+		&intent, &r.TargetKind, &peerID, &r.CreatedAt, &r.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
 	r.MediaType = mediaType
 	r.Intent = intent
+	r.PeerID = peerID
 	if err := assignToolAllow(&r, toolAllowRaw); err != nil {
 		return nil, err
 	}
@@ -219,17 +220,18 @@ func scanRoutes(rows *sql.Rows) ([]store.ChannelAgentRouteData, error) {
 	var out []store.ChannelAgentRouteData
 	for rows.Next() {
 		var r store.ChannelAgentRouteData
-		var mediaType, intent *string
+		var mediaType, intent, peerID *string
 		var toolAllowRaw []byte
 		if err := rows.Scan(
 			&r.ID, &r.TenantID, &r.ChannelInstanceID, &r.AgentID, &r.Name,
 			&r.PeerKind, &mediaType, &r.MentionRequired, &r.Priority, &r.IsEnabled, &toolAllowRaw,
-			&intent, &r.TargetKind, &r.CreatedAt, &r.UpdatedAt,
+			&intent, &r.TargetKind, &peerID, &r.CreatedAt, &r.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
 		r.MediaType = mediaType
 		r.Intent = intent
+		r.PeerID = peerID
 		if err := assignToolAllow(&r, toolAllowRaw); err != nil {
 			return nil, err
 		}

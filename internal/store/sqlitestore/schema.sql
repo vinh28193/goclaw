@@ -2312,6 +2312,11 @@ CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_channel_intent
 ALTER TABLE channel_agent_routes ADD COLUMN target_kind VARCHAR(20) NOT NULL DEFAULT 'agent';
 CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_target
     ON channel_agent_routes(target_kind, agent_id);
+-- Path 5: peer_id for per-chat pinning (migration 085). NULL = match any peer.
+ALTER TABLE channel_agent_routes ADD COLUMN peer_id VARCHAR(128);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_channel_peer
+    ON channel_agent_routes(channel_instance_id, peer_id)
+    WHERE peer_id IS NOT NULL;
 
 -- channel_routing_affinity: sticky (channel, peer) → agent binding (mirror of PG migration 000082).
 -- Resolver checks affinity FIRST (short-circuit), then falls through to rule eval, then upserts.

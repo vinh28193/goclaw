@@ -218,6 +218,54 @@ func TestSQLiteChannelAgentRouteStore_UpdateAndDelete(t *testing.T) {
 	}
 }
 
+func TestSQLiteChannelAgentRouteStore_PeerIDRoundtrip(t *testing.T) {
+	s, ctx, _, channelID, agentID := newTestRouteStore(t)
+
+	// Test with peer_id set
+	peerID := "12345"
+	r := &store.ChannelAgentRouteData{
+		ChannelInstanceID: channelID,
+		AgentID:           agentID,
+		Name:              "peer-pinned",
+		PeerKind:          "direct",
+		Priority:          50,
+		IsEnabled:         true,
+		PeerID:            &peerID,
+	}
+	if err := s.Create(ctx, r); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	got, err := s.Get(ctx, r.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.PeerID == nil || *got.PeerID != "12345" {
+		t.Fatalf("peer_id roundtrip failed: got %v", got.PeerID)
+	}
+
+	// Test with peer_id nil
+	r2 := &store.ChannelAgentRouteData{
+		ChannelInstanceID: channelID,
+		AgentID:           agentID,
+		Name:              "no-peer-pin",
+		PeerKind:          "direct",
+		Priority:          100,
+		IsEnabled:         true,
+	}
+	if err := s.Create(ctx, r2); err != nil {
+		t.Fatalf("Create r2: %v", err)
+	}
+
+	got2, err := s.Get(ctx, r2.ID)
+	if err != nil {
+		t.Fatalf("Get r2: %v", err)
+	}
+	if got2.PeerID != nil {
+		t.Fatalf("peer_id should be nil, got %v", got2.PeerID)
+	}
+}
+
 // --- test helpers ---
 
 func newTestRouteStore(t *testing.T) (*SQLiteChannelAgentRouteStore, context.Context, *sql.DB, uuid.UUID, uuid.UUID) {

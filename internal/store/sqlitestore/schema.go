@@ -16,7 +16,7 @@ var schemaSQL string
 
 // SchemaVersion is the current SQLite schema version.
 // Bump this when adding new migration steps below.
-const SchemaVersion = 53
+const SchemaVersion = 54
 
 // migrations maps version → SQL to apply when upgrading FROM that version.
 // schema.sql always represents the LATEST full schema (for fresh DBs).
@@ -860,6 +860,8 @@ CREATE INDEX IF NOT EXISTS idx_skill_user_grants_tenant ON skill_user_grants(ten
 	51: addChannelAgentRoutesIntentColumn,
 	// Version 52 → 53: channel_agent_routes.target_kind for agent vs team dispatch.
 	52: addChannelAgentRoutesTargetKindColumn,
+	// Version 53 → 54: channel_agent_routes.peer_id for per-chat linking.
+	53: addChannelAgentRoutesPeerIDColumn,
 }
 
 const addUsageEventAnalyticsTables = `
@@ -958,6 +960,12 @@ ALTER TABLE channel_agent_routes ADD COLUMN intent VARCHAR(50);
 CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_channel_intent
     ON channel_agent_routes(channel_instance_id, intent)
     WHERE intent IS NOT NULL;`
+
+const addChannelAgentRoutesPeerIDColumn = `
+ALTER TABLE channel_agent_routes ADD COLUMN peer_id VARCHAR(128);
+CREATE INDEX IF NOT EXISTS idx_channel_agent_routes_channel_peer
+    ON channel_agent_routes(channel_instance_id, peer_id)
+    WHERE peer_id IS NOT NULL;`
 
 const addChannelRoutingAffinityTable = `
 CREATE TABLE IF NOT EXISTS channel_routing_affinity (

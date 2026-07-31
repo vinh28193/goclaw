@@ -26,7 +26,7 @@ func NewSQLiteChannelAgentRouteStore(db *sql.DB) *SQLiteChannelAgentRouteStore {
 
 const channelAgentRouteSelectCols = `id, tenant_id, channel_instance_id, agent_id, name,
  peer_kind, media_type, mention_required, priority, is_enabled, tool_allow,
- intent, target_kind, created_at, updated_at`
+ intent, target_kind, peer_id, created_at, updated_at`
 
 func (s *SQLiteChannelAgentRouteStore) Create(ctx context.Context, r *store.ChannelAgentRouteData) error {
 	if r.ChannelInstanceID == uuid.Nil {
@@ -77,11 +77,11 @@ func (s *SQLiteChannelAgentRouteStore) Create(ctx context.Context, r *store.Chan
 	_, err = s.db.ExecContext(ctx,
 		`INSERT INTO channel_agent_routes (id, tenant_id, channel_instance_id, agent_id, name,
 		 peer_kind, media_type, mention_required, priority, is_enabled, tool_allow,
-		 intent, target_kind, created_at, updated_at)
-		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		 intent, target_kind, peer_id, created_at, updated_at)
+		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		r.ID, r.TenantID, r.ChannelInstanceID, r.AgentID, r.Name,
 		r.PeerKind, r.MediaType, boolToInt(r.MentionRequired), r.Priority, boolToInt(r.IsEnabled), toolAllowJSON,
-		r.Intent, r.TargetKind, now, now,
+		r.Intent, r.TargetKind, r.PeerID, now, now,
 	)
 	return err
 }
@@ -202,19 +202,20 @@ func (s *SQLiteChannelAgentRouteStore) ListByTenant(ctx context.Context) ([]stor
 
 func scanRouteSQLite(row *sql.Row) (*store.ChannelAgentRouteData, error) {
 	var r store.ChannelAgentRouteData
-	var mediaType, intent *string
+	var mediaType, intent, peerID *string
 	var toolAllowRaw *string
 	var mentionInt, enabledInt int
 	createdAt, updatedAt := scanTimePair()
 	if err := row.Scan(
 		&r.ID, &r.TenantID, &r.ChannelInstanceID, &r.AgentID, &r.Name,
 		&r.PeerKind, &mediaType, &mentionInt, &r.Priority, &enabledInt, &toolAllowRaw,
-		&intent, &r.TargetKind, createdAt, updatedAt,
+		&intent, &r.TargetKind, &peerID, createdAt, updatedAt,
 	); err != nil {
 		return nil, err
 	}
 	r.MediaType = mediaType
 	r.Intent = intent
+	r.PeerID = peerID
 	r.MentionRequired = mentionInt != 0
 	r.IsEnabled = enabledInt != 0
 	r.CreatedAt = createdAt.Time
@@ -230,19 +231,20 @@ func scanRoutesSQLite(rows *sql.Rows) ([]store.ChannelAgentRouteData, error) {
 	var out []store.ChannelAgentRouteData
 	for rows.Next() {
 		var r store.ChannelAgentRouteData
-		var mediaType, intent *string
+		var mediaType, intent, peerID *string
 		var toolAllowRaw *string
 		var mentionInt, enabledInt int
 		createdAt, updatedAt := scanTimePair()
 		if err := rows.Scan(
 			&r.ID, &r.TenantID, &r.ChannelInstanceID, &r.AgentID, &r.Name,
 			&r.PeerKind, &mediaType, &mentionInt, &r.Priority, &enabledInt, &toolAllowRaw,
-			&intent, &r.TargetKind, createdAt, updatedAt,
+			&intent, &r.TargetKind, &peerID, createdAt, updatedAt,
 		); err != nil {
 			return nil, err
 		}
 		r.MediaType = mediaType
 		r.Intent = intent
+		r.PeerID = peerID
 		r.MentionRequired = mentionInt != 0
 		r.IsEnabled = enabledInt != 0
 		r.CreatedAt = createdAt.Time
