@@ -109,7 +109,7 @@ func TestDedupCache_SweepExpiredRemovesStale(t *testing.T) {
 	nowBase := time.Unix(1_700_000_000, 0)
 	c.now = func() time.Time { return nowBase }
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		_ = c.Seen("k" + strconv.Itoa(i))
 	}
 	if c.Len() != 10 {
@@ -146,10 +146,10 @@ func TestDedupCache_ConcurrentSeenIsSafe(t *testing.T) {
 	const perWorker = 200
 
 	wg.Add(workers)
-	for w := 0; w < workers; w++ {
+	for w := range workers {
 		go func(id int) {
 			defer wg.Done()
-			for i := 0; i < perWorker; i++ {
+			for i := range perWorker {
 				_ = c.Seen("key" + strconv.Itoa(i))
 			}
 		}(w)

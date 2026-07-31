@@ -145,7 +145,7 @@ func TestAlbumAggregator_ResetsOnNewArrival(t *testing.T) {
 	a := newAlbumAggregator(80*time.Millisecond, 100, 1000, cap.callback())
 	defer a.Stop()
 
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		a.Push(mkAlbumMsg(1, 10, "g1", 100+i), rctxZero())
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -184,7 +184,7 @@ func TestAlbumAggregator_RespectsPerBufferCap(t *testing.T) {
 	a := newAlbumAggregator(time.Minute, 5, 1000, cap.callback())
 	defer a.Stop()
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		if !a.Push(mkAlbumMsg(1, 10, "g1", 100+i), rctxZero()) {
 			t.Fatalf("push %d rejected before cap reached", i)
 		}
@@ -202,7 +202,7 @@ func TestAlbumAggregator_RespectsGlobalBufferCap(t *testing.T) {
 	a := newAlbumAggregator(time.Minute, 100, 3, cap.callback())
 	defer a.Stop()
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if !a.Push(mkAlbumMsg(int64(i+1), 10, fmt.Sprintf("g%d", i), 100), rctxZero()) {
 			t.Fatalf("push %d rejected before global cap reached", i)
 		}

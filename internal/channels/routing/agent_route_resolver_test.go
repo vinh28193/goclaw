@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -18,20 +19,13 @@ import (
 //
 // Keep this in sync with mcp/tool_filter.go: allow nil = open, deny first wins.
 func allowGate(tool string, allow, deny []string) bool {
-	for _, d := range deny {
-		if d == tool {
-			return false
-		}
+	if slices.Contains(deny, tool) {
+		return false
 	}
 	if len(allow) == 0 {
 		return true
 	}
-	for _, a := range allow {
-		if a == tool {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allow, tool)
 }
 
 // fakeRouteStore is a controllable ChannelAgentRouteStore for resolver tests.
@@ -66,7 +60,8 @@ func (f *fakeRouteStore) ListByChannelInstance(_ context.Context, ch uuid.UUID) 
 	return out, nil
 }
 
-func ptrStr(s string) *string { return &s }
+//go:fix inline
+func ptrStr(s string) *string { return new(s) }
 
 func ptrAllow(a ...string) *[]string {
 	v := append([]string(nil), a...)
@@ -172,7 +167,7 @@ func TestResolver_MediaTypeFilter(t *testing.T) {
 	voiceAgent, textAgent := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
 	fs := &fakeRouteStore{routes: map[uuid.UUID][]store.ChannelAgentRouteData{
 		chID: {
-			newRoute(voiceAgent, "direct", ptrStr("voice"), false, 50, true, nil),
+			newRoute(voiceAgent, "direct", new("voice"), false, 50, true, nil),
 			newRoute(textAgent, "direct", nil, false, 100, true, nil),
 		},
 	}}
@@ -244,7 +239,7 @@ func TestResolver_CacheHitAvoidsRepeatStoreCall(t *testing.T) {
 		chID: {newRoute(agent, "direct", nil, false, 100, true, nil)},
 	}}
 	r := NewAgentRouteResolver(fs, 30*time.Second)
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		r.Resolve(context.Background(), chID, "", "", "direct", MediaKindText, false)
 	}
 	if fs.calls != 1 {
@@ -504,7 +499,7 @@ func TestCachedIntentClassifier_DedupesIdenticalMessages(t *testing.T) {
 	inner := &recordingClassifier{returnIntent: "billing"}
 	c := NewCachedIntentClassifier(inner, time.Hour)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		intent, _ := c.Classify(context.Background(), "ch-X", "I want refund")
 		if intent != "billing" {
 			t.Fatalf("got %q", intent)
@@ -612,10 +607,10 @@ func TestResolver_TeamTargetDoesNotCreateAffinity(t *testing.T) {
 // fakeAffinityStore is an in-memory ChannelRoutingAffinityStore used to
 // test sticky resolver behavior without standing up PG.
 type fakeAffinityStore struct {
-	rows      map[string]*store.ChannelRoutingAffinityData // key: channelID+":"+peerID
-	getCalls  int
+	rows        map[string]*store.ChannelRoutingAffinityData // key: channelID+":"+peerID
+	getCalls    int
 	upsertCalls int
-	upsertErr error
+	upsertErr   error
 }
 
 func newFakeAffinityStore() *fakeAffinityStore {
@@ -922,7 +917,7 @@ func TestResolvePeerIDExactMatch(t *testing.T) {
 	chID := uuid.Must(uuid.NewV7())
 	agentX, agentY := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
 	pinned := newRoute(agentX, "direct", nil, false, 10, true, nil)
-	pinned.PeerID = ptrStr("111")
+	pinned.PeerID = new("111")
 	catchAll := newRoute(agentY, "direct", nil, false, 100, true, nil)
 	fs := &fakeRouteStore{routes: map[uuid.UUID][]store.ChannelAgentRouteData{
 		chID: {pinned, catchAll},
@@ -943,8 +938,8 @@ func TestResolvePeerIDStillAppliesOtherFilters(t *testing.T) {
 	chID := uuid.Must(uuid.NewV7())
 	agentX, agentY := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
 	// Pinned route: peer_id="111", peer_kind=direct, media_type=voice.
-	pinned := newRoute(agentX, "direct", ptrStr(MediaKindVoice), false, 10, true, nil)
-	pinned.PeerID = ptrStr("111")
+	pinned := newRoute(agentX, "direct", new(MediaKindVoice), false, 10, true, nil)
+	pinned.PeerID = new("111")
 	// Catch-all: no pin, any media, lower priority.
 	catchAll := newRoute(agentY, "direct", nil, false, 100, true, nil)
 	fs := &fakeRouteStore{routes: map[uuid.UUID][]store.ChannelAgentRouteData{

@@ -798,14 +798,14 @@ func TestApkMutex_SerializesConcurrentUpgrades(t *testing.T) {
 	const goroutines = 10
 	results := make(chan response, goroutines)
 
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		go func() {
 			// All pass validation; execution fails (no apk binary) — that's OK.
 			results <- handleRequest(request{Action: "upgrade", Package: "curl"})
 		}()
 	}
 
-	for i := 0; i < goroutines; i++ {
+	for range goroutines {
 		resp := <-results
 		// Must NOT be a validation error — the package name is valid.
 		if resp.Code == "validation" {

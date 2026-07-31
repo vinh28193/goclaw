@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -43,9 +44,7 @@ func (s *gatewayOperatorSecureCLIStore) Update(_ context.Context, id uuid.UUID, 
 		s.updated = map[uuid.UUID]map[string]any{}
 	}
 	cp := map[string]any{}
-	for k, v := range updates {
-		cp[k] = v
-	}
+	maps.Copy(cp, updates)
 	s.updated[id] = cp
 	for i := range s.binaries {
 		if s.binaries[i].ID != id {

@@ -59,18 +59,19 @@ func extractEntityNames(text string) []string {
 			continue
 		}
 		// Collect consecutive capitalized words as phrase
-		phrase := cleanWord(w)
+		var phrase strings.Builder
+		phrase.WriteString(cleanWord(w))
 		for j := i + 1; j < len(words); j++ {
 			next := words[j]
 			if len(next) < 2 || !unicode.IsUpper([]rune(next)[0]) {
 				break
 			}
-			phrase += " " + cleanWord(next)
+			phrase.WriteString(" " + cleanWord(next))
 			i = j
 		}
-		if len(phrase) >= 3 && !seen[phrase] {
-			seen[phrase] = true
-			entities = append(entities, phrase)
+		if len(phrase.String()) >= 3 && !seen[phrase.String()] {
+			seen[phrase.String()] = true
+			entities = append(entities, phrase.String())
 			if len(entities) >= 20 {
 				break
 			}

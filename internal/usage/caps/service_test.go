@@ -524,4 +524,5 @@ func (s *fakeProviderStore) UpdateProvider(context.Context, uuid.UUID, map[strin
 }
 func (s *fakeProviderStore) DeleteProvider(context.Context, uuid.UUID) error { return nil }
 
-func int64Ptr(v int64) *int64 { return &v }
+//go:fix inline
+func int64Ptr(v int64) *int64 { return new(v) }

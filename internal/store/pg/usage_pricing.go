@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -269,10 +270,8 @@ func appendUniqueString(values []string, next string) []string {
 	if next == "" {
 		return values
 	}
-	for _, existing := range values {
-		if existing == next {
-			return values
-		}
+	if slices.Contains(values, next) {
+		return values
 	}
 	return append(values, next)
 }

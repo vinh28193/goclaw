@@ -634,7 +634,7 @@ func TestRouter_HandleEvent_DuplicateReturns2xx(t *testing.T) {
 	r.RegisterBot(914, disp)
 
 	// First post — should dispatch.
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		req := httptest.NewRequest(http.MethodPost, "/bitrix24/events",
 			buildEventBody("portal.bitrix24.com", "APP", 914, "m-dup"))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -930,7 +930,7 @@ func TestRouter_ConcurrentEvents_ProcessedIndependently(t *testing.T) {
 	const N = 50
 	var wg sync.WaitGroup
 	wg.Add(N)
-	for i := 0; i < N; i++ {
+	for i := range N {
 		go func(i int) {
 			defer wg.Done()
 			req := httptest.NewRequest(http.MethodPost, "/bitrix24/events",

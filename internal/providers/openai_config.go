@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"maps"
 	"net/http"
 	"strings"
 )
@@ -14,15 +15,15 @@ type OpenAIProvider struct {
 	chatPath     string // defaults to "/chat/completions"
 	authPrefix   string // auth header prefix, defaults to "Bearer " if empty
 	defaultModel string
-	providerType string // DB provider_type (e.g. "gemini_native", "openai", "minimax_native")
-	siteURL      string // optional site URL for provider identification (e.g. OpenRouter HTTP-Referer)
-	siteTitle    string // optional site title for provider identification (e.g. OpenRouter X-Title)
+	providerType string            // DB provider_type (e.g. "gemini_native", "openai", "minimax_native")
+	siteURL      string            // optional site URL for provider identification (e.g. OpenRouter HTTP-Referer)
+	siteTitle    string            // optional site title for provider identification (e.g. OpenRouter X-Title)
 	extraHeaders map[string]string // static headers set on every outgoing request (e.g. fixed User-Agent for kimi_coding)
 	client       *http.Client
 	retryConfig  RetryConfig
 	middlewares  RequestMiddleware // composed middleware chain (nil = no-op)
-	registry     ModelRegistry    // model resolution registry (nil = skip)
-	noAuthHeader bool             // when true, doRequest() skips setting Authorization (e.g. Vertex OAuth transport injects its own)
+	registry     ModelRegistry     // model resolution registry (nil = skip)
+	noAuthHeader bool              // when true, doRequest() skips setting Authorization (e.g. Vertex OAuth transport injects its own)
 }
 
 func NewOpenAIProvider(name, apiKey, apiBase, defaultModel string) *OpenAIProvider {
@@ -75,9 +76,7 @@ func (p *OpenAIProvider) WithExtraHeaders(h map[string]string) *OpenAIProvider {
 	if p.extraHeaders == nil {
 		p.extraHeaders = make(map[string]string, len(h))
 	}
-	for k, v := range h {
-		p.extraHeaders[k] = v
-	}
+	maps.Copy(p.extraHeaders, h)
 	return p
 }
 
@@ -88,9 +87,7 @@ func (p *OpenAIProvider) ExtraHeaders() map[string]string {
 		return nil
 	}
 	out := make(map[string]string, len(p.extraHeaders))
-	for k, v := range p.extraHeaders {
-		out[k] = v
-	}
+	maps.Copy(out, p.extraHeaders)
 	return out
 }
 

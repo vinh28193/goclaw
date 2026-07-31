@@ -344,8 +344,8 @@ func pickRemoteFromArgv(args []string, fallback string) string {
 // pickPushRemoteFromArgv handles `git push`'s extra `--repo=<remote>` shape.
 func pickPushRemoteFromArgv(args []string, fallback string) string {
 	for _, a := range args {
-		if strings.HasPrefix(a, "--repo=") {
-			return strings.TrimPrefix(a, "--repo=")
+		if after, ok := strings.CutPrefix(a, "--repo="); ok {
+			return after
 		}
 	}
 	return pickRemoteFromArgv(args, fallback)

@@ -8,17 +8,18 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 )
 
-func strp(s string) *string { return &s }
+//go:fix inline
+func strp(s string) *string { return new(s) }
 
 func TestCostMicrosTokenAndFlatDimensions(t *testing.T) {
 	got, err := CostMicros(store.UsagePricingFields{
-		Input:      strp("0.000001"),
-		Output:     strp("0.000002"),
-		CacheRead:  strp("0.0000001"),
-		CacheWrite: strp("0.0000002"),
-		Request:    strp("0.01"),
-		Image:      strp("0.02"),
-		WebSearch:  strp("0.03"),
+		Input:      new("0.000001"),
+		Output:     new("0.000002"),
+		CacheRead:  new("0.0000001"),
+		CacheWrite: new("0.0000002"),
+		Request:    new("0.01"),
+		Image:      new("0.02"),
+		WebSearch:  new("0.03"),
 	}, BillableUsage{
 		InputTokens:      1000,
 		OutputTokens:     500,
@@ -38,7 +39,7 @@ func TestCostMicrosTokenAndFlatDimensions(t *testing.T) {
 }
 
 func TestCostMicrosMissingRequiredPrice(t *testing.T) {
-	_, err := CostMicros(store.UsagePricingFields{Input: strp("0.000001")}, BillableUsage{
+	_, err := CostMicros(store.UsagePricingFields{Input: new("0.000001")}, BillableUsage{
 		InputTokens:  1,
 		OutputTokens: 1,
 	})

@@ -179,10 +179,7 @@ func (h *SessionsHandler) handleHistoryFollow(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	end := cursor + limit
-	if end > total {
-		end = total
-	}
+	end := min(cursor+limit, total)
 	messages := append([]providers.Message(nil), history[cursor:end]...)
 	secret := FileSigningKey()
 	for i := range messages {

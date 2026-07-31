@@ -168,7 +168,7 @@ func markdownToBitrixBBCode(text string) string {
 	// convergence is bounded by input length.
 	italicStar := regexp.MustCompile(`(^|[^\w*])\*([^*\n]+?)\*([^\w*]|$)`)
 	italicUnder := regexp.MustCompile(`(^|[^\w_])_([^_\n]+?)_([^\w_]|$)`)
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		prev := text
 		text = italicStar.ReplaceAllString(text, "$1[i]$2[/i]$3")
 		text = italicUnder.ReplaceAllString(text, "$1[i]$2[/i]$3")
@@ -560,7 +560,7 @@ func bxRenderTableCellMarkdown(cell string) string {
 
 	italicStar := regexp.MustCompile(`(^|[^\w*])\*([^*\n]+?)\*([^\w*]|$)`)
 	italicUnder := regexp.MustCompile(`(^|[^\w_])_([^_\n]+?)_([^\w_]|$)`)
-	for i := 0; i < 8; i++ {
+	for range 8 {
 		prev := cell
 		cell = italicStar.ReplaceAllString(cell, "$1[i]$2[/i]$3")
 		cell = italicUnder.ReplaceAllString(cell, "$1[i]$2[/i]$3")

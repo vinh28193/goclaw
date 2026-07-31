@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,7 +35,7 @@ func TestGeminiProtocolMapping(t *testing.T) {
 
 	fmt.Println("-> Testing Gemini Protocol Mapping...")
 
-	var collectedText string
+	var collectedText strings.Builder
 	_, err = proc.Prompt(ctx, sid, []ContentBlock{
 		{Type: "text", Text: "Hello, reply with 'ACP_SUCCESS' and nothing else."},
 	}, func(su SessionUpdate) {
@@ -42,7 +43,7 @@ func TestGeminiProtocolMapping(t *testing.T) {
 			for _, b := range su.Message.Content {
 				if b.Type == "text" {
 					fmt.Printf("<- MAPPED CHUNK: %s\n", b.Text)
-					collectedText += b.Text
+					collectedText.WriteString(b.Text)
 				}
 			}
 		}
@@ -52,8 +53,8 @@ func TestGeminiProtocolMapping(t *testing.T) {
 		t.Fatalf("Prompt failed: %v", err)
 	}
 
-	fmt.Printf("== COLLECTED TOTAL: %s ==\n", collectedText)
-	if collectedText == "" {
+	fmt.Printf("== COLLECTED TOTAL: %s ==\n", collectedText.String())
+	if collectedText.String() == "" {
 		t.Error("No text collected via mapped Message field!")
 	}
 }

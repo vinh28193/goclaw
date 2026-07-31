@@ -8,6 +8,7 @@ package bus
 
 import (
 	"log/slog"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -197,9 +198,7 @@ func mergeInboundMessages(msgs []InboundMessage) InboundMessage {
 		} else {
 			// Copy-on-write: don't mutate the input message's map.
 			cloned := make(map[string]string, len(last.Metadata)+1)
-			for k, v := range last.Metadata {
-				cloned[k] = v
-			}
+			maps.Copy(cloned, last.Metadata)
 			last.Metadata = cloned
 		}
 		last.Metadata["merged_message_ids"] = merged
@@ -233,7 +232,7 @@ func collectMergedMessageIDs(msgs []InboundMessage) string {
 		}
 		// Already-merged messages bring their full ID list.
 		if existing := m.Metadata["merged_message_ids"]; existing != "" {
-			for _, id := range strings.Split(existing, ",") {
+			for id := range strings.SplitSeq(existing, ",") {
 				add(id)
 			}
 		}

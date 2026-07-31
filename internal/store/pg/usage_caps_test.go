@@ -50,15 +50,13 @@ func TestPGUsageCapStoreReserveUsageIdempotent(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make(chan error, 2)
 	for range 2 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			errs <- usageStore.ReconcileUsage(context.Background(), store.UsageReconcileRequest{
 				ReservationKey: req.ReservationKey,
 				ActualTokens:   7,
 				Status:         "reconciled",
 			})
-		}()
+		})
 	}
 	wg.Wait()
 	close(errs)
@@ -177,4 +175,5 @@ func TestPGUsageCapStoreResolvePricingUsesOpenRouterAliases(t *testing.T) {
 	}
 }
 
-func int64PtrPG(v int64) *int64 { return &v }
+//go:fix inline
+func int64PtrPG(v int64) *int64 { return new(v) }

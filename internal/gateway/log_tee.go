@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"log/slog"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -289,9 +290,7 @@ func (t *LogTee) recentEntries() []map[string]any {
 
 func cloneLogEntry(in map[string]any) map[string]any {
 	out := make(map[string]any, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
+	maps.Copy(out, in)
 	return out
 }
 

@@ -121,7 +121,7 @@ func TestCheckIdempotency_malformedStoredHash(t *testing.T) {
 	existing := &store.WebhookCallData{
 		ID:             uuid.New(),
 		WebhookID:      webhookID,
-		IdempotencyKey: strPtr("idem-key-1"),
+		IdempotencyKey: new("idem-key-1"),
 		RequestPayload: malformedPayload,
 		Status:         "completed",
 	}
@@ -194,7 +194,9 @@ func TestCheckIdempotency_StaleSyncReservationExpires(t *testing.T) {
 }
 
 // strPtr is a test helper returning a pointer to s.
-func strPtr(s string) *string { return &s }
+//
+//go:fix inline
+func strPtr(s string) *string { return new(s) }
 
 // TestBuildAuditPayload_validJSON ensures the output is always valid JSON
 // (the property that prevented PG 22P02 errors).

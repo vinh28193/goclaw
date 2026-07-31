@@ -2,6 +2,7 @@ package providers
 
 import (
 	"encoding/json"
+	"maps"
 
 	"github.com/nextlevelbuilder/goclaw/internal/i18n"
 	"github.com/nextlevelbuilder/goclaw/internal/msgintent"
@@ -17,8 +18,8 @@ import (
 // For the optional rich-block lines an entry rendering to "" DROPS the line;
 // the opener/decline/degraded slots never go empty (fallback to built-in).
 type OfflineSettings struct {
-	Tone         string                      `json:"tone"`   // casual|humble|business|minimal (default humble)
-	Locale       string                      `json:"locale"` // en|vi|zh (default vi)
+	Tone         string                      `json:"tone"`                   // casual|humble|business|minimal (default humble)
+	Locale       string                      `json:"locale"`                 // en|vi|zh (default vi)
 	ReplyPrefix  string                      `json:"reply_prefix,omitempty"` // e.g. "[offline]" — prepended to every reply (not NO_REPLY)
 	HelpText     string                      `json:"help_text,omitempty"`    // value of the {help} template var; empty → built-in i18n hint
 	Templates    map[string][]string         `json:"templates,omitempty"`    // slot → template pool (see Slot* consts)
@@ -97,9 +98,7 @@ func mergeTemplatePools(agent, provider map[string][]string) map[string][]string
 		return nil
 	}
 	out := make(map[string][]string, len(agent)+len(provider))
-	for slot, pool := range provider {
-		out[slot] = pool
-	}
+	maps.Copy(out, provider)
 	for slot, pool := range agent {
 		if len(pool) > 0 {
 			out[slot] = pool
@@ -152,9 +151,7 @@ func (s OfflineSettings) renderSlot(slot string, vars map[string]string, seed ui
 // every template override so decline/degraded replies can guide the user.
 func (s OfflineSettings) withHelpVar(vars map[string]string) map[string]string {
 	merged := make(map[string]string, len(vars)+1)
-	for k, v := range vars {
-		merged[k] = v
-	}
+	maps.Copy(merged, vars)
 	merged["help"] = s.helpText()
 	return merged
 }

@@ -716,7 +716,7 @@ func TestWebhookRouterDuplicateSignedBodyDoesNotDispatchTwice(t *testing.T) {
 	router, ch, msgBus := newTestRouter(t, cfg)
 
 	body := buildWebhookBody("page-test", "conv-1", "INBOX", "user-1", "", "inbox msg", "")
-	for i := 0; i < 2; i++ {
+	for i := range 2 {
 		req := httptest.NewRequest(http.MethodPost, webhookPath, strings.NewReader(body))
 		signTestPancakeRequest(req, body, ch.webhookSecret)
 		w := httptest.NewRecorder()

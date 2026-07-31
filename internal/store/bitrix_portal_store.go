@@ -35,14 +35,14 @@ type BitrixPortalCredentials struct {
 type BitrixPortalState struct {
 	AccessToken      string            `json:"access_token,omitempty"`
 	RefreshToken     string            `json:"refresh_token,omitempty"`
-	ExpiresAt        time.Time         `json:"expires_at,omitempty"`
+	ExpiresAt        time.Time         `json:"expires_at"`
 	MemberID         string            `json:"member_id,omitempty"`
 	AppToken         string            `json:"app_token,omitempty"` // auth.application_token from OAuth response
 	Scope            string            `json:"scope,omitempty"`
 	ClientEndpoint   string            `json:"client_endpoint,omitempty"`
 	RegisteredBots   map[string]int    `json:"registered_bots,omitempty"` // bot_code → bot_id
 	MediaFolders     map[string]string `json:"media_folders,omitempty"`   // bot_code → disk folder id
-	LastRefreshAt    time.Time         `json:"last_refresh_at,omitempty"`
+	LastRefreshAt    time.Time         `json:"last_refresh_at"`
 	LastRefreshError string            `json:"last_refresh_error,omitempty"`
 	ConsecutiveFail  int               `json:"consecutive_fail,omitempty"`
 

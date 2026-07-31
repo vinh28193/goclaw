@@ -34,7 +34,7 @@ func seedDedupFromMerged(dedupe *bus.DedupeCache, msg bus.InboundMessage) {
 	if merged == "" {
 		return
 	}
-	for _, id := range strings.Split(merged, ",") {
+	for id := range strings.SplitSeq(merged, ",") {
 		id = strings.TrimSpace(id)
 		if id == "" {
 			continue

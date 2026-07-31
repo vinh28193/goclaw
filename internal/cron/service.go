@@ -91,11 +91,9 @@ func (cs *Service) Start() error {
 	// after a previous Stop() returned but the runLoop goroutine hasn't yet
 	// executed its ticker construction.
 	tick := runLoopTickInterval
-	cs.loopWG.Add(1)
-	go func() {
-		defer cs.loopWG.Done()
+	cs.loopWG.Go(func() {
 		cs.runLoop(cs.stopChan, tick)
-	}()
+	})
 
 	slog.Info("cron service started", "jobs", len(cs.store.Jobs))
 	return nil

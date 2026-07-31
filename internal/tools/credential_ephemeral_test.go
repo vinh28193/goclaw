@@ -65,16 +65,14 @@ func TestMaterializeEphemeral_ConcurrentCleanup(t *testing.T) {
 
 	var nilCount, errCount atomic.Int32
 	var wg sync.WaitGroup
-	for i := 0; i < 64; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 64 {
+		wg.Go(func() {
 			if err := cleanup(); err == nil {
 				nilCount.Add(1)
 			} else {
 				errCount.Add(1)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

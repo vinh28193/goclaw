@@ -118,7 +118,7 @@ func (c *mcpClient) autoOnboard(ctx context.Context, req autoOnboardRequest) (*a
 	// path (Bitrix24 expects a response in <30s and will retry on 5xx itself)
 	// so we cap total attempts at 2 with a short backoff.
 	var lastErr error
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := range 2 {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():

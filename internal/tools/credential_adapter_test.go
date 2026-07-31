@@ -162,9 +162,9 @@ func TestHashHostScope(t *testing.T) {
 
 func TestSortedKeys_Deterministic(t *testing.T) {
 	in := map[string]string{
-		"GIT_SSH_COMMAND": "ssh -i /tmp/x",
+		"GIT_SSH_COMMAND":     "ssh -i /tmp/x",
 		"GIT_TERMINAL_PROMPT": "0",
-		"GIT_CONFIG_COUNT": "1",
+		"GIT_CONFIG_COUNT":    "1",
 	}
 	got := sortedKeys(in)
 	want := []string{"GIT_CONFIG_COUNT", "GIT_SSH_COMMAND", "GIT_TERMINAL_PROMPT"}
@@ -219,7 +219,7 @@ func TestScrubBag_ConcurrentAdds(t *testing.T) {
 	// Race-detector smoke test for the per-bag mutex.
 	ctx := WithScrubBag(context.Background())
 	var wg sync.WaitGroup
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()

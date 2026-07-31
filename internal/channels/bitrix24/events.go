@@ -42,16 +42,16 @@ type Event struct {
 // reject spoofed webhooks — AppToken is the stable per-install secret,
 // MemberID is the stable portal id (stable across domain renames).
 type EventAuth struct {
-	Domain           string
-	AppToken         string
-	AccessToken      string
-	RefreshToken     string
-	MemberID         string
-	ExpiresIn        int
-	Scope            string
-	ServerEndpoint   string
-	ClientEndpoint   string
-	Status           string
+	Domain         string
+	AppToken       string
+	AccessToken    string
+	RefreshToken   string
+	MemberID       string
+	ExpiresIn      int
+	Scope          string
+	ServerEndpoint string
+	ClientEndpoint string
+	Status         string
 }
 
 // EventParams covers the `data[PARAMS]` section plus resolved bot/user ids.
@@ -233,7 +233,7 @@ func parseFormEvent(v url.Values) (*Event, error) {
 	}
 
 	// Files iterate indices until name+url both empty.
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		name := formGet(v, "data", "PARAMS", "FILES", strconv.Itoa(i), "name")
 		url := firstNonEmpty(
 			formGet(v, "data", "PARAMS", "FILES", strconv.Itoa(i), "urlMachine"),

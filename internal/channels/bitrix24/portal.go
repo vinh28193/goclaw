@@ -644,10 +644,7 @@ func (p *Portal) refreshLoop(ctx context.Context) {
 			// admin just completed Exchange() from another goroutine.
 			wait = 1 * time.Minute
 		default:
-			wait = time.Until(expiry) - expiryBuffer
-			if wait < 30*time.Second {
-				wait = 30 * time.Second
-			}
+			wait = max(time.Until(expiry)-expiryBuffer, 30*time.Second)
 		}
 
 		select {

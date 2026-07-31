@@ -184,7 +184,7 @@ func TestResolveContactName_UnknownUser_NegativeCached(t *testing.T) {
 
 	// Retry storm: simulate 5 follow-up webhook events for the same
 	// unknown user. All must hit the negative cache.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		_, _ = bc.resolveContactName(context.Background(), "ghost-user")
 	}
 	if got := calls.Load(); got != 1 {

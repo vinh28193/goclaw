@@ -405,7 +405,7 @@ func TestPortal_AccessToken_SingleflightCoalescesConcurrent(t *testing.T) {
 	wg.Add(N)
 	results := make([]string, N)
 	errs := make([]error, N)
-	for i := 0; i < N; i++ {
+	for i := range N {
 		go func(idx int) {
 			defer wg.Done()
 			tok, err := p.AccessToken(context.Background())
