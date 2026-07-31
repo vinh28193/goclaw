@@ -308,9 +308,8 @@ func TestChannelAgentRoutes_Integration_PeerIDMatching(t *testing.T) {
 		t.Fatalf("create catch-all route: %v", err)
 	}
 
-	// Retrieve and verify peer_id field persists
-	got, err := routeStore.Get(ctx, peerID)
-	// Note: this will fail because peerID is not the route ID; we need to list and check
+	// Retrieve and verify peer_id field persists via the list read path
+	// (Get takes the route's uuid.UUID primary key, not the peer identifier).
 	list, err := routeStore.ListByChannelInstance(ctx, channelID)
 	if err != nil {
 		t.Fatalf("list routes: %v", err)
