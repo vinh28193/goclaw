@@ -19,6 +19,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -199,19 +200,23 @@ func (r *AgentRouteResolver) ResolveDecision(
 	// for the Path 4 follow-up to store target_kind alongside agent_id.
 	if r.affinityStore != nil && peerID != "" {
 		if bound, err := r.affinityStore.Get(ctx, channelInstanceID, peerID); err == nil && bound != nil {
-			// Stale-cache-window guard: a peer-pinned route for this exact
-			// peerID always takes precedence over a sticky binding. Without
-			// this check, a binding created moments before an operator
-			// pinned (or repinned) the peer — or created from a stale
-			// per-node route cache right after link — would silently mask
-			// the pin for up to DefaultAffinityTTL (1h) in multi-node
-			// deployments. Revalidate against the current pinned route (if
-			// any) and only honor the shortcut when they agree.
+			// Stale-cache-window guard: a peer-pinned route for this peerID
+			// (or, for group composite peer ids, its chat scope) always takes
+			// precedence over a sticky binding. Without this check, a binding
+			// created moments before an operator pinned (or repinned) the
+			// chat — or created from a stale per-node route cache right
+			// after link — would silently mask the pin for up to
+			// DefaultAffinityTTL (1h) in multi-node deployments. Revalidate
+			// against the current pinned route (if any) and only honor the
+			// shortcut when they agree.
 			stale := false
 			if routes, routesErr := r.loadRoutes(ctx, channelInstanceID); routesErr == nil {
 				for i := range routes {
 					route := &routes[i]
-					if !route.IsEnabled || route.PeerID == nil || *route.PeerID != peerID {
+					if !route.IsEnabled || route.PeerID == nil {
+						continue
+					}
+					if *route.PeerID != peerID && *route.PeerID != chatScopeOf(peerID) {
 						continue
 					}
 					stale = route.AgentID != bound.AgentID || route.TargetKind == store.RouteTargetTeam
@@ -263,8 +268,10 @@ func (r *AgentRouteResolver) ResolveDecision(
 		if route.PeerKind != peerKind {
 			continue
 		}
-		// Peer-pinned routing: non-nil PeerID only matches its exact peer.
-		if route.PeerID != nil && *route.PeerID != peerID {
+		// Peer-pinned routing: a pinned route binds the whole chat, so it
+		// matches either the exact peer or (for group composite peer ids
+		// "chatID:senderID") the chat scope alone.
+		if route.PeerID != nil && *route.PeerID != peerID && *route.PeerID != chatScopeOf(peerID) {
 			continue
 		}
 		if route.MediaType != nil && *route.MediaType != mediaKind {
@@ -346,6 +353,17 @@ func (r *AgentRouteResolver) InvalidateLocal(channelInstanceID uuid.UUID) {
 
 func (r *AgentRouteResolver) invalidateLocal(channelInstanceID uuid.UUID) {
 	r.cache.Delete(channelInstanceID)
+}
+
+// chatScopeOf returns the chat portion of a composite "chatID:senderID" peer
+// id (group messages); DMs pass through unchanged. Pinned routes bind the
+// whole chat, so they match on chat scope while sticky affinity stays
+// per-sender on the full composite.
+func chatScopeOf(peerID string) string {
+	if idx := strings.IndexByte(peerID, ':'); idx > 0 {
+		return peerID[:idx]
+	}
+	return peerID
 }
 
 // anyRouteHasIntent reports whether at least one route has a non-null Intent

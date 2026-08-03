@@ -883,6 +883,43 @@ func TestAffinityKeptWhenPinnedRouteAgrees(t *testing.T) {
 	}
 }
 
+// The affinity stale-guard (peer-pinned route override check) must also
+// compare on chat scope: a sticky binding for one group member's composite
+// peer id ("-100:42") can be masked by a route pinned to the bare chat id
+// ("-100") — the guard has to recognize the chat-wide pin as authoritative
+// over the per-sender binding, same as rule eval does.
+func TestAffinityStaleGuardUsesChatScope(t *testing.T) {
+	chID := uuid.Must(uuid.NewV7())
+	agentA, agentB := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
+	pinned := newRoute(agentB, "group", nil, false, 10, true, nil)
+	pinned.PeerID = new("-100")
+	fs := &fakeRouteStore{routes: map[uuid.UUID][]store.ChannelAgentRouteData{
+		chID: {pinned},
+	}}
+	r := NewAgentRouteResolver(fs, time.Hour)
+	aff := newFakeAffinityStore()
+	r.SetAffinityStore(aff, time.Hour)
+
+	// Sticky binding for the composite peer (chat -100, sender 42) is bound to
+	// agent A — stale relative to the chat-wide pin on agent B.
+	if err := aff.Upsert(context.Background(), &store.ChannelRoutingAffinityData{
+		ChannelInstanceID: chID,
+		PeerID:            "-100:42",
+		AgentID:           agentA,
+		ExpiresAt:         time.Now().Add(time.Hour),
+	}); err != nil {
+		t.Fatalf("seed affinity: %v", err)
+	}
+
+	a, _, m, err := r.Resolve(context.Background(), chID, "-100:42", "", "group", MediaKindText, false)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if !m || a != agentB {
+		t.Fatalf("chat-pinned route must override stale per-sender affinity: agent=%v matched=%v", a, m)
+	}
+}
+
 // fakeInvalidatePublisher captures Publish calls so tests assert that
 // Invalidate fans out to peers in addition to evicting the local cache.
 type fakeInvalidatePublisher struct {
@@ -1039,6 +1076,31 @@ func TestResolvePeerIDStillAppliesOtherFilters(t *testing.T) {
 	// additional filter, not a bypass.
 	if a, _, m, _ := r.Resolve(context.Background(), chID, "111", "", "direct", MediaKindText, false); !m || a != agentY {
 		t.Fatalf("peer 111 with text must fail pinned's media_type=voice and match catch-all: agent=%v matched=%v", a, m)
+	}
+}
+
+// Peer-pinned routes bind the whole chat, not one sender. Channels build a
+// composite peer id for group messages (chatID + ":" + senderID — see
+// telegram/handlers.go ~line 690 and channel.go ~line 674) so each group
+// member gets its own sticky-affinity binding, but a route pinned to the
+// bare chat id must still match every composite peer id derived from that
+// chat.
+func TestResolvePeerIDMatchesChatScopeForGroupComposite(t *testing.T) {
+	chID := uuid.Must(uuid.NewV7())
+	agentX, agentY := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
+	pinned := newRoute(agentX, "group", nil, false, 10, true, nil)
+	pinned.PeerID = new("-100")
+	catchAll := newRoute(agentY, "group", nil, false, 100, true, nil)
+	fs := &fakeRouteStore{routes: map[uuid.UUID][]store.ChannelAgentRouteData{
+		chID: {pinned, catchAll},
+	}}
+	r := NewAgentRouteResolver(fs, 0)
+
+	if a, _, m, _ := r.Resolve(context.Background(), chID, "-100:42", "", "group", MediaKindText, false); !m || a != agentX {
+		t.Fatalf("composite peer -100:42 should match route pinned to chat -100: agent=%v matched=%v", a, m)
+	}
+	if a, _, m, _ := r.Resolve(context.Background(), chID, "-999:42", "", "group", MediaKindText, false); !m || a != agentY {
+		t.Fatalf("composite peer -999:42 (different chat) should skip pinned route and fall through to catch-all: agent=%v matched=%v", a, m)
 	}
 }
 
