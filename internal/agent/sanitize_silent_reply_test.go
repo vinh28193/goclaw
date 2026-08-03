@@ -31,6 +31,13 @@ func TestIsSilentReply(t *testing.T) {
 		{"prefix + space + content", "NO_REPLY hello", true},
 		{"prefix + colon + content", "NO_REPLY: offline", true},
 		{"prefix + because", "NO_REPLY because user is away", true},
+		// Silent — pure decoration: lazy stand-ins for NO_REPLY seen live
+		// (gemini replied literal "..." to group messages, 260803).
+		{"ellipsis", "...", true},
+		{"single dot", ".", true},
+		{"question-bang", "?!", true},
+		{"dashes", "---", true},
+		{"decorated ellipsis", "*...*", true},
 		// NOT silent — token glued to another word, or not at start.
 		{"embedded word", "NO_REPLYING", false},
 		{"trailing after content", "Here you go. NO_REPLY", false},

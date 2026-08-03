@@ -396,6 +396,12 @@ func IsSilentReply(text string) bool {
 	}
 	// Strip decorative wrappers from both ends (quotes, markdown emphasis, punctuation).
 	stripped := strings.Trim(trimmed, "_ \t\n\r.,:;!?\"'`*~#>-()[]{}")
+	// Pure decoration ("...", "?!", "---") — models sometimes emit these as a
+	// lazy stand-in for NO_REPLY in group chats; delivering a literal "..."
+	// reads as a glitch, so treat it as silence too.
+	if stripped == "" {
+		return true
+	}
 	const token = "NO_REPLY"
 	if len(stripped) < len(token) {
 		return false
