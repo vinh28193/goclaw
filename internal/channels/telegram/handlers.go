@@ -21,6 +21,8 @@ import (
 
 // handleMessage processes an incoming Telegram update.
 func (c *Channel) handleMessage(ctx context.Context, update telego.Update) {
+	// Tenant-scope the polling context — see processResolvedMessage for why.
+	ctx = store.WithTenantID(ctx, c.TenantID())
 	message := update.Message
 	if message == nil {
 		return
@@ -439,6 +441,12 @@ func (c *Channel) processResolvedMessage(ctx context.Context, rctx resolvedMessa
 	if len(members) == 0 {
 		return
 	}
+	// Tenant-scope the message context (same as zalo handlers). The channel is
+	// started with the server root ctx — no tenant — and tenant-scoped store
+	// queries downstream fail SILENTLY on uuid.Nil: ListByChannelInstance
+	// returns zero routes, so the agent route resolver never matches and every
+	// message falls back to the instance default agent.
+	ctx = store.WithTenantID(ctx, c.TenantID())
 	rep := members[0]
 	user := rep.From
 	content := rctx.content
