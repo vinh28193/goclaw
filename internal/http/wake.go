@@ -148,7 +148,7 @@ func (h *WakeHandler) handleWake(w http.ResponseWriter, r *http.Request) {
 	ctx, drainTeamDispatch := tools.InjectTeamDispatch(ctx, h.postTurn)
 	defer drainTeamDispatch()
 
-	result, err := loop.Run(ctx, agent.RunRequest{
+	runReq := agent.RunRequest{
 		SessionKey: sessionKey,
 		Message:    req.Message,
 		Channel:    "wake",
@@ -156,7 +156,10 @@ func (h *WakeHandler) handleWake(w http.ResponseWriter, r *http.Request) {
 		RunID:      runID,
 		UserID:     userID,
 		Stream:     false,
-	})
+	}
+	applyWakeIdentity(&runReq, req.Metadata)
+
+	result, err := loop.Run(ctx, runReq)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": fmt.Sprintf("agent run failed: %v", err)})
 		return
@@ -207,6 +210,63 @@ func metaString(meta map[string]any, key string) string {
 		}
 	}
 	return ""
+}
+
+// applyWakeIdentity folds a caller-supplied chat identity out of wake
+// metadata into req, when present.
+//
+// Design (Track B Task 10b, hybrid pass-through): a wake caller that already
+// knows the real chat identity behind this run (e.g. affiliate-backend's
+// daily-digest cron, which knows the schedule's owner contact) passes it
+// structurally via metadata's `sender_id`/`sender_name`/`channel`/`chat_id`/
+// `chat_type` keys — the same vocabulary bridge_identity.go injects into MCP
+// tool args for live channel messages — instead of only as LLM-readable text
+// in the wake `message`. Folding it into RunRequest here means the EXISTING
+// identity-injection pipe (bridge_identity.go::injectSenderIdentity, keyed
+// off SenderID/Channel/ChatID/PeerKind via ctx) works unmodified for wake
+// runs, so owner-gated MCP tools (require_owner-style checks) see a real
+// identity instead of the "wake"/"api" placeholders.
+//
+// Gated on `sender_id` being present and non-empty: a plain wake with no
+// identity keys (or with only some of channel/chat_id, no sender_id) leaves
+// req entirely untouched — Channel/ChatID keep their "wake"/"api"
+// placeholders and SenderID/SenderName/PeerKind stay at Go zero values,
+// exactly matching pre-Task-10b behavior. Channel/ChatID are overridden
+// individually only when metadata actually supplies a non-empty value, so a
+// sender_id-only caller still gets its wake/api placeholders where metadata
+// doesn't say otherwise.
+func applyWakeIdentity(req *agent.RunRequest, meta map[string]any) {
+	senderID := metaString(meta, "sender_id")
+	if senderID == "" {
+		return
+	}
+	req.SenderID = senderID
+	req.SenderName = metaString(meta, "sender_name")
+	if channel := metaString(meta, "channel"); channel != "" {
+		req.Channel = channel
+	}
+	if chatID := metaString(meta, "chat_id"); chatID != "" {
+		req.ChatID = chatID
+	}
+	// injectSenderIdentity derives chat_type from PeerKind ("group" vs.
+	// anything else → "private_chat") — there is no direct ChatType field on
+	// RunRequest. Map the metadata's chat_type the same way real channel
+	// handlers set PeerKind ("direct" for DMs, "group" for group chats).
+	//
+	// "supergroup" maps to "group" too, not the "direct" fallback: the
+	// telegram channel handler's own isGroup check treats "group" and
+	// "supergroup" identically (internal/channels/telegram/handlers.go —
+	// `isGroup := message.Chat.Type == "group" || message.Chat.Type ==
+	// "supergroup"`), and RunRequest/session PeerKind only ever has two
+	// values (direct/group) downstream — there is no separate "supergroup"
+	// PeerKind to fold into. "supergroup" is a distinct value only in the
+	// channel_agent_routes CONFIG vocabulary (api-reference.md), not in the
+	// live per-message identity this function builds.
+	req.PeerKind = "direct"
+	switch metaString(meta, "chat_type") {
+	case "group", "supergroup":
+		req.PeerKind = "group"
+	}
 }
 
 // validateAttachmentPath rejects paths outside the storage mount, symlink
