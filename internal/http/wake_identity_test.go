@@ -91,15 +91,30 @@ func TestApplyWakeIdentity_DigestWakeIdentity_FoldedIn(t *testing.T) {
 	}
 }
 
-func TestApplyWakeIdentity_ChatTypeGroup_MapsToGroupPeerKind(t *testing.T) {
-	req := baseWakeRunRequest()
-	applyWakeIdentity(&req, map[string]any{
-		"sender_id": "u1",
-		"chat_type": "group",
-	})
+func TestApplyWakeIdentity_ChatTypeGroupOrSupergroup_MapsToGroupPeerKind(t *testing.T) {
+	// "supergroup" must map to "group" the same way "group" does: the
+	// telegram channel handler's own isGroup check treats them identically
+	// (handlers.go: `isGroup := message.Chat.Type == "group" ||
+	// message.Chat.Type == "supergroup"`), and there is no separate
+	// "supergroup" PeerKind downstream.
+	cases := []struct {
+		chatType string
+	}{
+		{chatType: "group"},
+		{chatType: "supergroup"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.chatType, func(t *testing.T) {
+			req := baseWakeRunRequest()
+			applyWakeIdentity(&req, map[string]any{
+				"sender_id": "u1",
+				"chat_type": tc.chatType,
+			})
 
-	if req.PeerKind != "group" {
-		t.Errorf("PeerKind = %q, want group", req.PeerKind)
+			if req.PeerKind != "group" {
+				t.Errorf("PeerKind = %q, want group (chat_type=%s)", req.PeerKind, tc.chatType)
+			}
+		})
 	}
 }
 

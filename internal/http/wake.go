@@ -252,8 +252,19 @@ func applyWakeIdentity(req *agent.RunRequest, meta map[string]any) {
 	// anything else → "private_chat") — there is no direct ChatType field on
 	// RunRequest. Map the metadata's chat_type the same way real channel
 	// handlers set PeerKind ("direct" for DMs, "group" for group chats).
+	//
+	// "supergroup" maps to "group" too, not the "direct" fallback: the
+	// telegram channel handler's own isGroup check treats "group" and
+	// "supergroup" identically (internal/channels/telegram/handlers.go —
+	// `isGroup := message.Chat.Type == "group" || message.Chat.Type ==
+	// "supergroup"`), and RunRequest/session PeerKind only ever has two
+	// values (direct/group) downstream — there is no separate "supergroup"
+	// PeerKind to fold into. "supergroup" is a distinct value only in the
+	// channel_agent_routes CONFIG vocabulary (api-reference.md), not in the
+	// live per-message identity this function builds.
 	req.PeerKind = "direct"
-	if metaString(meta, "chat_type") == "group" {
+	switch metaString(meta, "chat_type") {
+	case "group", "supergroup":
 		req.PeerKind = "group"
 	}
 }

@@ -173,6 +173,8 @@ POST /v1/agents/{id}/wake
 
 Response: `{content, run_id, usage?}`. Used by orchestrators (n8n, Paperclip) to trigger agent runs.
 
+`metadata` keys `sender_id`, `channel`, `chat_id`, `chat_type` are reserved: when `sender_id` is present and non-empty, they are folded into the run's identity (`SenderID`/`Channel`/`ChatID`/`PeerKind`) the same way a live channel message would be, so owner-gated tools see a real identity instead of the `wake`/`api` placeholders — `chat_type` of `group` or `supergroup` both map to the `group` peer kind. Any other `metadata` keys pass through untouched to the agent run.
+
 ### Codex/OpenAI OAuth Routing in `chatgpt_oauth_routing`
 
 For agents whose main `provider` is a `chatgpt_oauth` provider, top-level `chatgpt_oauth_routing`
