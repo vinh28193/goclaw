@@ -29,6 +29,15 @@ const OptChatID = "chat_id"
 // OptPeerKind passes the peer kind (direct/group) for MCP bridge context.
 const OptPeerKind = "peer_kind"
 
+// OptSenderID passes the original INDIVIDUAL sender ID — differs from OptUserID
+// in group chats, where UserID is the group-aggregated session user
+// ("group:telegram:-123") but SenderID stays the person who typed. Mirrors what
+// mcp/bridge_identity.go injects; consumed by forward_metadata providers.
+const OptSenderID = "sender_id"
+
+// OptSenderName passes the sender display name from channel metadata.
+const OptSenderName = "sender_name"
+
 // OptWorkspace passes the agent workspace path so MCP bridge tools can resolve file paths.
 const OptWorkspace = "workspace"
 

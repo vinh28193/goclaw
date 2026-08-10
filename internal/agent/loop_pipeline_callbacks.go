@@ -322,6 +322,10 @@ func (l *Loop) makeCallLLM(req *RunRequest, emitRun func(AgentEvent)) func(ctx c
 		chatReq.Options[providers.OptChannel] = req.Channel
 		chatReq.Options[providers.OptChatID] = req.ChatID
 		chatReq.Options[providers.OptPeerKind] = req.PeerKind
+		// Individual sender (≠ UserID in groups) — forward_metadata providers
+		// need the real person for role resolution (same source as MCP identity).
+		chatReq.Options[providers.OptSenderID] = req.SenderID
+		chatReq.Options[providers.OptSenderName] = req.SenderName
 		chatReq.Options[providers.OptWasMentioned] = req.WasMentioned
 		// Per-agent offline settings override — offline provider merges it on top
 		// of its stored defaults; other providers ignore the key (mirrors

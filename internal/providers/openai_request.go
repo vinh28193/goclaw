@@ -259,6 +259,9 @@ func (p *OpenAIProvider) buildRequestBody(model string, req ChatRequest, stream 
 
 	// affiliate-brain (Track C): forward per-message identity so the BE brain
 	// can resolve caller role. Gated per-provider — other providers unaffected.
+	// Mirrors mcp/bridge_identity.go: sender_id is the INDIVIDUAL sender
+	// (OptSenderID; OptUserID is the group-aggregated session user in groups),
+	// chat_type is the same "group"/"private_chat" mapping the MCP path uses.
 	if p.forwardMetadata {
 		md := map[string]any{}
 		copyOpt := func(optKey, wireKey string) {
@@ -266,11 +269,21 @@ func (p *OpenAIProvider) buildRequestBody(model string, req ChatRequest, stream 
 				md[wireKey] = v
 			}
 		}
-		copyOpt(OptUserID, "sender_id")
+		copyOpt(OptSenderID, "sender_id")
+		if _, ok := md["sender_id"]; !ok {
+			copyOpt(OptUserID, "sender_id") // direct HTTP callers without channel context
+		}
+		copyOpt(OptSenderName, "sender_name")
 		copyOpt(OptChatID, "chat_id")
 		copyOpt(OptChannel, "channel")
-		copyOpt(OptPeerKind, "chat_type")
 		copyOpt(OptSessionKey, "session_key")
+		if pk, ok := req.Options[OptPeerKind].(string); ok && pk != "" {
+			if pk == "group" {
+				md["chat_type"] = "group"
+			} else {
+				md["chat_type"] = "private_chat"
+			}
+		}
 		if len(md) > 0 {
 			body["metadata"] = md
 		}
