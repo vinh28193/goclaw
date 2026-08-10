@@ -125,6 +125,22 @@ type LLMProviderData struct {
 	Settings     json.RawMessage `json:"settings,omitempty" db:"settings"`
 }
 
+// ParseForwardMetadata reports whether the provider row opts into forwarding
+// per-message sender metadata on the OpenAI-compat wire (settings JSONB key
+// "forward_metadata" — affiliate-brain, Track C). Missing/malformed → false.
+func ParseForwardMetadata(settings json.RawMessage) bool {
+	if len(settings) == 0 {
+		return false
+	}
+	var s struct {
+		ForwardMetadata bool `json:"forward_metadata"`
+	}
+	if json.Unmarshal(settings, &s) != nil {
+		return false
+	}
+	return s.ForwardMetadata
+}
+
 // RequiredMemoryEmbeddingDimensions is the fixed vector size used by the pgvector memory schema.
 // All memory embeddings must match this dimensionality until the schema supports variable sizes.
 const RequiredMemoryEmbeddingDimensions = 1536

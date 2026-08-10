@@ -257,6 +257,25 @@ func (p *OpenAIProvider) buildRequestBody(model string, req ChatRequest, stream 
 		}
 	}
 
+	// affiliate-brain (Track C): forward per-message identity so the BE brain
+	// can resolve caller role. Gated per-provider — other providers unaffected.
+	if p.forwardMetadata {
+		md := map[string]any{}
+		copyOpt := func(optKey, wireKey string) {
+			if v, ok := req.Options[optKey]; ok && v != nil && v != "" {
+				md[wireKey] = v
+			}
+		}
+		copyOpt(OptUserID, "sender_id")
+		copyOpt(OptChatID, "chat_id")
+		copyOpt(OptChannel, "channel")
+		copyOpt(OptPeerKind, "chat_type")
+		copyOpt(OptSessionKey, "session_key")
+		if len(md) > 0 {
+			body["metadata"] = md
+		}
+	}
+
 	return body
 }
 

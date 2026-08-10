@@ -24,6 +24,7 @@ type OpenAIProvider struct {
 	middlewares  RequestMiddleware // composed middleware chain (nil = no-op)
 	registry     ModelRegistry     // model resolution registry (nil = skip)
 	noAuthHeader bool              // when true, doRequest() skips setting Authorization (e.g. Vertex OAuth transport injects its own)
+	forwardMetadata bool           // when true, buildRequestBody attaches sender identity as body["metadata"] (affiliate-brain, Track C)
 }
 
 func NewOpenAIProvider(name, apiKey, apiBase, defaultModel string) *OpenAIProvider {
@@ -42,6 +43,15 @@ func NewOpenAIProvider(name, apiKey, apiBase, defaultModel string) *OpenAIProvid
 		retryConfig:  DefaultRetryConfig(),
 		middlewares:  ComposeMiddlewares(FastModeMiddleware, ServiceTierMiddleware, CacheMiddleware),
 	}
+}
+
+// WithForwardMetadata opts this provider into forwarding per-message sender
+// identity (sender_id/chat_id/channel/chat_type/session_key) as a top-level
+// "metadata" object on the OpenAI-compat wire. Off by default — only the
+// affiliate-brain provider (Track C) sets it via settings.forward_metadata.
+func (p *OpenAIProvider) WithForwardMetadata(v bool) *OpenAIProvider {
+	p.forwardMetadata = v
+	return p
 }
 
 // WithChatPath returns a copy with a custom chat completions path (e.g. "/text/chatcompletion_v2" for MiniMax native API).
