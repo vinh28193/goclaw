@@ -215,6 +215,12 @@ func metaString(meta map[string]any, key string) string {
 // applyWakeIdentity folds a caller-supplied chat identity out of wake
 // metadata into req, when present.
 //
+// UNUSED since Track C (260810): affiliate-backend retired the daily-digest
+// wake — the digest is composed backend-side and delivered via the normal
+// message path, so no wake caller passes identity metadata anymore. Kept
+// per Track C spec §9 (wake stays a generic mechanism; other wake callers
+// may adopt identity pass-through later).
+//
 // Design (Track B Task 10b, hybrid pass-through): a wake caller that already
 // knows the real chat identity behind this run (e.g. affiliate-backend's
 // daily-digest cron, which knows the schedule's owner contact) passes it
