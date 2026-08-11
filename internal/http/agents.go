@@ -457,6 +457,15 @@ func (h *AgentsHandler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 
 	validationProvider := ag.Provider
 	if providerName, ok := allowed["provider"].(string); ok && providerName != "" {
+		// A provider name that resolves to nothing bricks the agent at
+		// runtime with no error at PUT time — reject the flip up front.
+		if providerName != ag.Provider {
+			if _, err := h.providerReg.Get(r.Context(), providerName); err != nil {
+				writeError(w, http.StatusBadRequest, protocol.ErrInvalidRequest,
+					i18n.T(locale, i18n.MsgInvalidRequest, fmt.Sprintf("unknown provider %q", providerName)))
+				return
+			}
+		}
 		validationProvider = providerName
 	}
 	validationAgent := *ag
