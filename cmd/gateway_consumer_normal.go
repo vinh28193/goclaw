@@ -266,11 +266,7 @@ func processNormalMessage(
 	isGroup := peerKind == string(sessions.PeerGroup)
 	enableStream := deps.ChannelMgr != nil && deps.ChannelMgr.IsStreamingChannel(msg.Channel, isGroup)
 
-	// Group chats allow concurrent runs (multiple users can chat simultaneously).
-	maxConcurrent := 1
-	if peerKind == string(sessions.PeerGroup) {
-		maxConcurrent = 3
-	}
+	maxConcurrent := inboundMaxConcurrent(isGroup, agentLoop)
 
 	runID := fmt.Sprintf("inbound-%s-%s-%s", msg.Channel, msg.ChatID, uuid.NewString()[:8])
 

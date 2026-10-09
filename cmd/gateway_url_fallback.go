@@ -277,3 +277,22 @@ func backendOwnsBrain(loop agent.Agent) bool {
 	fm, ok := p.(interface{ ForwardsMetadata() bool })
 	return ok && fm.ForwardsMetadata()
 }
+
+// inboundMaxConcurrent returns how many runs one session may have at once.
+// Group chats allow 3 (several users chat simultaneously). DMs allow 1 so a
+// second message queues behind the active run, except for backend-brain agents:
+// they get 2 so the second message reaches the backend while the first turn is
+// still running, and the backend handles it as an interjection (backend spec
+// docs/superpowers/specs/2026-10-02-mid-turn-interjection-design.md). That also
+// skips goclaw's busy-session classifier, which cannot classify through the
+// backend-brain provider.
+func inboundMaxConcurrent(isGroup bool, loop agent.Agent) int {
+	switch {
+	case isGroup:
+		return 3
+	case loop != nil && backendOwnsBrain(loop):
+		return 2
+	default:
+		return 1
+	}
+}

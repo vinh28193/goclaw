@@ -50,3 +50,25 @@ func TestComposeOfflineURLReply_StillRunsForGoclawBrainAgents(t *testing.T) {
 		t.Fatalf("expected the fallback to call detect_url")
 	}
 }
+
+func TestInboundMaxConcurrent(t *testing.T) {
+	brain := &fallbackStubAgent{provider: providers.NewOpenAIProvider("affiliate-brain-75", "k", "http://be", "m").
+		WithForwardMetadata(true)}
+	plain := &fallbackStubAgent{provider: providers.NewOpenAIProvider("openrouter", "k", "http://llm", "m")}
+	cases := []struct {
+		name    string
+		isGroup bool
+		loop    agent.Agent
+		want    int
+	}{
+		{"group", true, brain, 3},
+		{"dm backend brain", false, brain, 2},
+		{"dm goclaw brain", false, plain, 1},
+		{"dm no agent", false, nil, 1},
+	}
+	for _, c := range cases {
+		if got := inboundMaxConcurrent(c.isGroup, c.loop); got != c.want {
+			t.Errorf("%s: got %d, want %d", c.name, got, c.want)
+		}
+	}
+}
