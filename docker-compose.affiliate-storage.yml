@@ -3,4 +3,4 @@
 services:
   goclaw:
     volumes:
-      - /Users/vinh/Workpaces/python-basic/affiliate-backend/storage:/app/storage:ro
+      - ../backend/storage:/app/storage:ro
