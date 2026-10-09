@@ -627,8 +627,7 @@ func processNormalMessage(
 					if reply := composeOfflineURLReply(fbCtx, agentLoop, url); reply != "" {
 						slog.Info("inbound: offline url fallback engaged (MCP)",
 							"channel", channel, "url", url)
-						// DEV-ONLY prefix — remove when going to prod.
-						errContent = "[fallback]\n" + reply
+						errContent = reply
 					} else {
 						slog.Warn("inbound: offline url fallback returned empty", "url", url)
 					}

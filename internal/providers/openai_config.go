@@ -54,6 +54,10 @@ func (p *OpenAIProvider) WithForwardMetadata(v bool) *OpenAIProvider {
 	return p
 }
 
+// ForwardsMetadata reports whether this provider is the affiliate-brain backend,
+// which runs the whole agent turn (tools, retry, fallback) server-side.
+func (p *OpenAIProvider) ForwardsMetadata() bool { return p.forwardMetadata }
+
 // WithChatPath returns a copy with a custom chat completions path (e.g. "/text/chatcompletion_v2" for MiniMax native API).
 func (p *OpenAIProvider) WithChatPath(path string) *OpenAIProvider {
 	p.chatPath = path

@@ -60,6 +60,9 @@ func (p *OpenAIProvider) chatRequestFn(ctx context.Context, body map[string]any)
 }
 
 func (p *OpenAIProvider) ChatStream(ctx context.Context, req ChatRequest, onChunk func(StreamChunk)) (*ChatResponse, error) {
+	if p.forwardMetadata {
+		return p.chatAsSingleChunk(ctx, req, onChunk)
+	}
 	model := p.resolveModel(req.Model)
 	// stripThinking suppresses user-visible reasoning while leaving
 	// Usage.ThinkingTokens untouched (the usage chunk below still records it).
@@ -217,6 +220,24 @@ func (p *OpenAIProvider) ChatStream(ctx context.Context, req ChatRequest, onChun
 	}
 
 	return result, nil
+}
+
+// chatAsSingleChunk serves ChatStream for forward_metadata providers (the
+// affiliate-brain backend). That backend runs the whole agent turn server-side,
+// answers non-streaming JSON only and rejects stream=true with 400, so a channel
+// with streaming or reasoning bubbles enabled would fail every message.
+func (p *OpenAIProvider) chatAsSingleChunk(ctx context.Context, req ChatRequest, onChunk func(StreamChunk)) (*ChatResponse, error) {
+	resp, err := p.Chat(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if onChunk != nil {
+		if resp.Content != "" {
+			onChunk(StreamChunk{Content: resp.Content})
+		}
+		onChunk(StreamChunk{Done: true})
+	}
+	return resp, nil
 }
 
 const maxToolCallIDLen = 40
