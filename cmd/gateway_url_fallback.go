@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nextlevelbuilder/goclaw/internal/agent"
+	"github.com/nextlevelbuilder/goclaw/internal/providers"
 )
 
 // firstURLPattern extracts the first http(s) URL in arbitrary text.
@@ -84,6 +85,12 @@ type commissionResult struct {
 // Vietnamese reply. Returns empty string if any step fails fatally.
 func composeOfflineURLReply(ctx context.Context, loop agent.Agent, url string) string {
 	if loop == nil || url == "" {
+		return ""
+	}
+	if backendOwnsBrain(loop) {
+		// A goclaw-side timeout often means the backend turn already finished;
+		// rerunning the MCP tools would create a second shortlink.
+		slog.Info("offline_url: skipped, backend brain owns retry and fallback", "url", url)
 		return ""
 	}
 
@@ -257,4 +264,16 @@ func extractFirstJSON(content string) string {
 		}
 	}
 	return "{}"
+}
+
+// backendOwnsBrain reports whether the agent talks to the affiliate-brain
+// backend (forward_metadata provider). That backend runs tools, retry and
+// provider fallback itself, so the offline URL fallback must not run tools again.
+func backendOwnsBrain(loop agent.Agent) bool {
+	p := loop.Provider()
+	if fb, ok := p.(interface{ PrimaryProvider() providers.Provider }); ok {
+		p = fb.PrimaryProvider()
+	}
+	fm, ok := p.(interface{ ForwardsMetadata() bool })
+	return ok && fm.ForwardsMetadata()
 }
