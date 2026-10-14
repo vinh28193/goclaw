@@ -4,6 +4,14 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ---
 
+## 2026-10-14
+
+### Facebook first inbox via private replies
+
+- `features.first_inbox` now uses Messenger Private Replies (`recipient.comment_id`) instead of the Send API by `from.id`, deduped per comment, 7-day window, per-recipient errors no longer touch channel health.
+
+---
+
 ## 2026-06-13
 
 ### Cron NO_REPLY delivery suppression (issue #141)

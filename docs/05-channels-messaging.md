@@ -251,6 +251,13 @@ flowchart TD
 | Pairing support | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Status reactions | Yes | Yes | -- | Yes | -- | -- | -- |
 
+### Facebook First Inbox (Private Reply)
+
+- `features.first_inbox` sends a Messenger **private reply** after the public comment reply: `POST /{page-id}/messages` with `recipient.comment_id`, so commenters who never messaged the Page still receive it. Text: `first_inbox_message` (Vietnamese default).
+- Meta limits: within 7 days of the comment (gated locally via `comment_created_time` metadata), one private reply per comment (a repeat returns `10900`, treated as already sent), needs `pages_messaging`. Locally also capped at one per sender per 24h (in-memory).
+- Per-recipient rejections (e.g. `10/2018278`, `10903`, `551`) are logged only; app/Page-level permission errors (`200`, `10`, `10/1893063`) mark the channel Degraded (auth, retryable); token/rate-limit errors follow the normal mapping.
+- Replies to the DM arrive as Messenger events (chatID = PSID, a separate session) and need `features.messenger_auto_reply`.
+
 ---
 
 ## 5. Telegram
