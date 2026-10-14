@@ -246,10 +246,12 @@ func (g *GraphClient) doRequest(ctx context.Context, method, path string, body a
 		if resp.StatusCode >= 400 {
 			var apiErr graphErrorBody
 			if json.Unmarshal(respBody, &apiErr) == nil && apiErr.Error.Code != 0 {
-				// 24h messaging window violation — not retryable.
+				// Not retryable: 551 = recipient unavailable; 100/2018109 = attachment
+				// too large (Meta error-codes table — not a 24h-window error).
 				if apiErr.Error.Code == 551 || apiErr.Error.Subcode == 2018109 {
-					slog.Warn("facebook: 24h messaging window expired", "code", apiErr.Error.Code)
-					return nil, &graphAPIError{code: apiErr.Error.Code, msg: apiErr.Error.Message}
+					slog.Warn("facebook: non-retryable send error",
+						"code", apiErr.Error.Code, "subcode", apiErr.Error.Subcode)
+					return nil, &graphAPIError{code: apiErr.Error.Code, subcode: apiErr.Error.Subcode, msg: apiErr.Error.Message}
 				}
 				// Rate limited: sleep and retry (capped).
 				if resp.StatusCode == 429 && attempt < maxRetries-1 {
@@ -262,7 +264,7 @@ func (g *GraphClient) doRequest(ctx context.Context, method, path string, body a
 					}
 					continue
 				}
-				return nil, &graphAPIError{code: apiErr.Error.Code, msg: apiErr.Error.Message}
+				return nil, &graphAPIError{code: apiErr.Error.Code, subcode: apiErr.Error.Subcode, msg: apiErr.Error.Message}
 			}
 			return nil, fmt.Errorf("facebook: http %d", resp.StatusCode)
 		}
@@ -327,8 +329,9 @@ func validateFBID(id string) error {
 
 // graphAPIError is a structured error from the Facebook Graph API.
 type graphAPIError struct {
-	code int
-	msg  string
+	code    int
+	subcode int // error_subcode; 0 when absent
+	msg     string
 }
 
 func (e *graphAPIError) Error() string {

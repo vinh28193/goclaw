@@ -3,6 +3,7 @@ package facebook
 import (
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 )
 
@@ -53,6 +54,9 @@ func (ch *Channel) handleCommentEvent(entry WebhookEntry, change ChangeValue) {
 		"sender_id":           senderID,
 		"fb_mode":             "comment",
 		"reply_to_comment_id": change.CommentID,
+	}
+	if change.CreatedTime > 0 {
+		metadata["comment_created_time"] = strconv.FormatInt(change.CreatedTime, 10)
 	}
 
 	ch.HandleMessage(senderID, chatID, content, nil, metadata, "direct")

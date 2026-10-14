@@ -572,3 +572,141 @@ func TestGraphAPIErrorMessage(t *testing.T) {
 		t.Errorf("Error() = %q, want both code and msg", s)
 	}
 }
+
+// --- PrivateReply ---
+
+func TestPrivateReply_RequestShape(t *testing.T) {
+	var gotPath, gotMethod, gotAuth string
+	var gotBody map[string]any
+	g := newFakeGraph(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotMethod, gotAuth = r.URL.Path, r.Method, r.Header.Get("Authorization")
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &gotBody)
+		_, _ = w.Write([]byte(`{"recipient_id":"psid-1","message_id":"m-1"}`))
+	}))
+	if _, err := g.PrivateReply(context.Background(), "123_456", "chào"); err != nil {
+		t.Fatalf("PrivateReply: %v", err)
+	}
+	if gotPath != "/v25.0/111222333/messages" {
+		t.Errorf("path = %q, want /v25.0/111222333/messages", gotPath)
+	}
+	if gotMethod != http.MethodPost {
+		t.Errorf("method = %q, want POST", gotMethod)
+	}
+	if gotAuth != "Bearer fake-token" {
+		t.Errorf("auth = %q", gotAuth)
+	}
+	rec, _ := gotBody["recipient"].(map[string]any)
+	if rec == nil || rec["comment_id"] != "123_456" {
+		t.Errorf("recipient = %v, want comment_id=123_456", gotBody["recipient"])
+	}
+	if _, hasID := rec["id"]; hasID {
+		t.Errorf("recipient must not carry id: %v", rec)
+	}
+	msg, _ := gotBody["message"].(map[string]any)
+	if msg == nil || msg["text"] != "chào" {
+		t.Errorf("message = %v", gotBody["message"])
+	}
+}
+
+func TestPrivateReply_ParsesResult(t *testing.T) {
+	body := `{"recipient_id":"psid-1","message_id":"m-1"}`
+	g := newFakeGraph(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(body))
+	}))
+	res, err := g.PrivateReply(context.Background(), "123_456", "x")
+	if err != nil {
+		t.Fatalf("PrivateReply: %v", err)
+	}
+	if res.RecipientID != "psid-1" || res.MessageID != "m-1" {
+		t.Errorf("result = %+v", res)
+	}
+
+	body = `{}`
+	res, err = g.PrivateReply(context.Background(), "123_456", "x")
+	if err != nil {
+		t.Fatalf("empty body should not error: %v", err)
+	}
+	if res.RecipientID != "" || res.MessageID != "" {
+		t.Errorf("result = %+v, want empty", res)
+	}
+}
+
+func TestPrivateReply_InvalidCommentID(t *testing.T) {
+	var calls atomic.Int32
+	g := newFakeGraph(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+	}))
+	if _, err := g.PrivateReply(context.Background(), "abc", "x"); err == nil {
+		t.Fatal("expected error for invalid comment id")
+	}
+	if calls.Load() != 0 {
+		t.Errorf("calls = %d, want 0", calls.Load())
+	}
+}
+
+func TestGraphAPIError_KeepsSubcode(t *testing.T) {
+	g := newFakeGraph(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"code":10,"error_subcode":2018278,"message":"x"}}`))
+	}))
+	_, err := g.PrivateReply(context.Background(), "123_456", "x")
+	var ge *graphAPIError
+	if !errors.As(err, &ge) {
+		t.Fatalf("err = %v, want graphAPIError", err)
+	}
+	if ge.code != 10 || ge.subcode != 2018278 {
+		t.Errorf("code/subcode = %d/%d, want 10/2018278", ge.code, ge.subcode)
+	}
+	// 551 goes through the dedicated early-return branch; subcode must survive there too.
+	g2 := newFakeGraph(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"code":551,"error_subcode":1545041,"message":"x"}}`))
+	}))
+	_, err = g2.PrivateReply(context.Background(), "123_456", "x")
+	if !errors.As(err, &ge) || ge.code != 551 || ge.subcode != 1545041 {
+		t.Errorf("551 err = %v, want code 551 subcode 1545041", err)
+	}
+}
+
+func TestPrivateReplyClassifiers(t *testing.T) {
+	cases := []struct {
+		name                      string
+		err                       error
+		already, rejected, appLvl bool
+	}{
+		{"10900 already replied", &graphAPIError{code: 10900}, true, false, false},
+		{"10903 privacy", &graphAPIError{code: 10903}, false, true, false},
+		{"100/2534025", &graphAPIError{code: 100, subcode: 2534025}, false, true, false},
+		{"10/2018278", &graphAPIError{code: 10, subcode: 2018278}, false, true, false},
+		{"10/2534022", &graphAPIError{code: 10, subcode: 2534022}, false, true, false},
+		{"10/2018108", &graphAPIError{code: 10, subcode: 2018108}, false, true, false},
+		{"551", &graphAPIError{code: 551}, false, true, false},
+		{"551/1545041", &graphAPIError{code: 551, subcode: 1545041}, false, true, false},
+		{"200/1545041", &graphAPIError{code: 200, subcode: 1545041}, false, true, false},
+		{"190 auth", &graphAPIError{code: 190}, false, false, false},
+		{"4 rate", &graphAPIError{code: 4}, false, false, false},
+		{"10/0 app permission", &graphAPIError{code: 10}, false, false, true},
+		{"200 no subcode", &graphAPIError{code: 200}, false, false, true},
+		{"200/2018028", &graphAPIError{code: 200, subcode: 2018028}, false, false, true},
+		{"10/1404170", &graphAPIError{code: 10, subcode: 1404170}, false, false, true},
+		{"10/1893063", &graphAPIError{code: 10, subcode: 1893063}, false, false, true},
+		{"100/2018109 attachment", &graphAPIError{code: 100, subcode: 2018109}, false, false, false},
+		{"nil", nil, false, false, false},
+		{"plain", errors.New("plain"), false, false, false},
+		{"wrapped 10900", fmt.Errorf("wrap: %w", &graphAPIError{code: 10900}), true, false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsAlreadyReplied(tc.err); got != tc.already {
+				t.Errorf("IsAlreadyReplied = %v, want %v", got, tc.already)
+			}
+			if got := IsPrivateReplyRejected(tc.err); got != tc.rejected {
+				t.Errorf("IsPrivateReplyRejected = %v, want %v", got, tc.rejected)
+			}
+			if got := IsPrivateReplyAppLevel(tc.err); got != tc.appLvl {
+				t.Errorf("IsPrivateReplyAppLevel = %v, want %v", got, tc.appLvl)
+			}
+		})
+	}
+}

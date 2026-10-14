@@ -474,12 +474,12 @@ func TestSend_CommentModeWithMetadata(t *testing.T) {
 }
 
 // TestSendFirstInbox_OnceThenSkipped verifies the firstInboxSent dedup:
-// first call sends, second (same sender) is a no-op.
+// first call sends, second (same comment) is a no-op.
 func TestSendFirstInbox_OnceThenSkipped(t *testing.T) {
 	var sends int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		sends++
-		_, _ = w.Write([]byte(`{"message_id":"mid"}`))
+		_, _ = w.Write([]byte(`{"recipient_id":"psid-1","message_id":"mid"}`))
 	}))
 	t.Cleanup(srv.Close)
 	swapGraphBase(t, srv.URL)
@@ -489,8 +489,8 @@ func TestSendFirstInbox_OnceThenSkipped(t *testing.T) {
 		PageAccessToken: "t", AppSecret: "s", VerifyToken: "v",
 	}, mb, nil)
 
-	ch.sendFirstInbox(t.Context(), "user-1")
-	ch.sendFirstInbox(t.Context(), "user-1") // second call skipped
+	ch.sendFirstInbox(t.Context(), "111_222", "user-1", 0)
+	ch.sendFirstInbox(t.Context(), "111_222", "user-1", 0) // second call skipped
 
 	if sends != 1 {
 		t.Errorf("sends = %d, want 1 (second call deduped)", sends)
