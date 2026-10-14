@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -250,7 +251,9 @@ func (ch *Channel) Send(ctx context.Context, msg bus.OutboundMessage) error {
 
 		// First inbox: Messenger private reply to the commenter (best-effort).
 		if ch.config.Features.FirstInbox {
-			ch.sendFirstInbox(ctx, commentID, msg.Metadata["sender_id"], 0)
+			// Unparseable/missing created time → 0 (unknown): send and let Meta decide.
+			created, _ := strconv.ParseInt(msg.Metadata["comment_created_time"], 10, 64)
+			ch.sendFirstInbox(ctx, commentID, msg.Metadata["sender_id"], created)
 		}
 	}
 

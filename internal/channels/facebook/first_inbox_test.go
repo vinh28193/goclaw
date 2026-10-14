@@ -1,9 +1,11 @@
 package facebook
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -374,5 +376,86 @@ func TestEvictStale_FirstInboxMaps(t *testing.T) {
 	}
 	if _, ok := ch.firstInboxSenderSeen.Load("new"); !ok {
 		t.Error("firstInboxSenderSeen: fresh sender evicted")
+	}
+}
+
+func consumeInboundMeta(t *testing.T, ch *Channel) map[string]string {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	msg, ok := ch.Bus().ConsumeInbound(ctx)
+	if !ok {
+		t.Fatal("no inbound message published")
+	}
+	return msg.Metadata
+}
+
+func TestHandleCommentEvent_CommentCreatedTimeMetadata(t *testing.T) {
+	cfg := facebookInstanceConfig{}
+	cfg.Features.CommentReply = true
+	ch := newTestChannel(t, "111", cfg)
+
+	ch.handleCommentEvent(WebhookEntry{ID: "111"}, ChangeValue{
+		Item: "comment", Verb: "add", CommentID: "1_1", PostID: "1",
+		From: FBUser{ID: "999"}, Message: "hello", CreatedTime: 1700000000,
+	})
+	if got := consumeInboundMeta(t, ch)["comment_created_time"]; got != "1700000000" {
+		t.Errorf("comment_created_time = %q, want 1700000000", got)
+	}
+
+	ch.handleCommentEvent(WebhookEntry{ID: "111"}, ChangeValue{
+		Item: "comment", Verb: "add", CommentID: "1_2", PostID: "1",
+		From: FBUser{ID: "999"}, Message: "hello",
+	})
+	if v, ok := consumeInboundMeta(t, ch)["comment_created_time"]; ok {
+		t.Errorf("comment_created_time = %q, want absent when CreatedTime=0", v)
+	}
+}
+
+func TestFirstInbox_SkipsOlderThan7Days(t *testing.T) {
+	rec := &graphRecorder{}
+	ch := newFirstInboxChannel(t, rec)
+	msg := commentOutbound("111_222", "999")
+	msg.Metadata["comment_created_time"] = strconv.FormatInt(time.Now().Add(-8*24*time.Hour).Unix(), 10)
+
+	if err := ch.Send(t.Context(), msg); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if n := rec.count("/v25.0/111_222/comments"); n != 1 {
+		t.Errorf("comment replies = %d, want 1 (public reply still sent)", n)
+	}
+	if n := rec.count(privateReplyPath); n != 0 {
+		t.Errorf("private replies = %d, want 0 (outside 7-day window)", n)
+	}
+}
+
+func TestFirstInbox_RecentCreatedTimeSends(t *testing.T) {
+	rec := &graphRecorder{}
+	ch := newFirstInboxChannel(t, rec)
+	msg := commentOutbound("111_222", "999")
+	msg.Metadata["comment_created_time"] = strconv.FormatInt(time.Now().Add(-6*24*time.Hour).Unix(), 10)
+
+	if err := ch.Send(t.Context(), msg); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if n := rec.count(privateReplyPath); n != 1 {
+		t.Errorf("private replies = %d, want 1 (inside 7-day window)", n)
+	}
+}
+
+func TestFirstInbox_UnknownCreatedTimeStillSends(t *testing.T) {
+	for _, v := range []string{"", "not-a-number"} {
+		rec := &graphRecorder{}
+		ch := newFirstInboxChannel(t, rec)
+		msg := commentOutbound("111_222", "999")
+		if v != "" {
+			msg.Metadata["comment_created_time"] = v
+		}
+		if err := ch.Send(t.Context(), msg); err != nil {
+			t.Fatalf("Send: %v", err)
+		}
+		if n := rec.count(privateReplyPath); n != 1 {
+			t.Errorf("created_time %q: private replies = %d, want 1 (let Meta decide)", v, n)
+		}
 	}
 }

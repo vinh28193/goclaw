@@ -13,6 +13,7 @@ var routingMetaKeys = []string{
 	"sender_id",              // facebook sender for first-inbox / pancake sender for private-reply
 	"page_id",                // facebook page routing
 	"reply_to_comment_id",    // facebook/pancake comment reply target
+	"comment_created_time",   // facebook: comment unix time, gates the 7-day private-reply window
 	"pancake_mode",           // pancake inbox vs comment routing
 	"post_id",                // pancake: post id for template vars
 	"display_name",           // pancake: commenter display name for template vars

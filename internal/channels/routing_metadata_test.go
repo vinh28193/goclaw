@@ -62,3 +62,17 @@ func TestCopyRoutingMeta_PreservesPancakePrivateReplyKeys(t *testing.T) {
 		}
 	}
 }
+
+func TestRoutingMeta_PreservesFacebookCommentCreatedTime(t *testing.T) {
+	src := map[string]string{
+		"fb_mode":              "comment",
+		"reply_to_comment_id":  "111_222",
+		"comment_created_time": "1700000000",
+	}
+	if got := CopyFinalRoutingMeta(src)["comment_created_time"]; got != "1700000000" {
+		t.Fatalf("CopyFinalRoutingMeta()[comment_created_time] = %q, want 1700000000", got)
+	}
+	if got := copyRoutingMeta(src)["comment_created_time"]; got != "1700000000" {
+		t.Fatalf("copyRoutingMeta()[comment_created_time] = %q, want 1700000000", got)
+	}
+}
