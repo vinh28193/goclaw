@@ -41,8 +41,12 @@ type Channel struct {
 	// Value is the time.Time the event was first seen; entries are evicted after dedupTTL.
 	dedup sync.Map // eventKey(string) → time.Time
 
-	// firstInboxSent tracks which senders have already received a first-inbox DM (in-memory).
-	firstInboxSent sync.Map // senderID(string) → struct{}
+	// firstInboxSent tracks comments that already got a first-inbox private reply
+	// (in-memory; Meta enforces one per comment durably). Evicted after privateReplyWindow.
+	firstInboxSent sync.Map // commentID(string) → time.Time
+	// firstInboxSenderSeen caps first-inbox DMs to one per sender per firstInboxSenderTTL.
+	firstInboxSenderSeen sync.Map // senderID(string) → time.Time
+	firstInboxMu         sync.Mutex
 
 	// adminReplied tracks conversations where admin (page) sent a message recently.
 	// Bot skips auto-reply for these conversations to avoid duplicate responses.
@@ -244,12 +248,9 @@ func (ch *Channel) Send(ctx context.Context, msg bus.OutboundMessage) error {
 			return err
 		}
 
-		// First inbox: send a private DM after comment reply (best-effort).
+		// First inbox: Messenger private reply to the commenter (best-effort).
 		if ch.config.Features.FirstInbox {
-			senderID := msg.Metadata["sender_id"]
-			if senderID != "" {
-				ch.sendFirstInbox(ctx, senderID)
-			}
+			ch.sendFirstInbox(ctx, commentID, msg.Metadata["sender_id"], 0)
 		}
 	}
 
@@ -279,23 +280,8 @@ func (ch *Channel) handleAPIError(err error) {
 	}
 }
 
-// sendFirstInbox sends a one-time private DM after a comment reply (best-effort).
-func (ch *Channel) sendFirstInbox(ctx context.Context, senderID string) {
-	if _, alreadySent := ch.firstInboxSent.LoadOrStore(senderID, struct{}{}); alreadySent {
-		return
-	}
-	message := ch.config.FirstInboxMessage
-	if message == "" {
-		message = "Cảm ơn bạn đã comment! Mình có thể hỗ trợ thêm qua tin nhắn riêng."
-	}
-	if _, err := ch.graphClient.SendMessage(ctx, senderID, message); err != nil {
-		slog.Warn("facebook: first inbox send failed", "sender_id", senderID, "err", err)
-		ch.firstInboxSent.Delete(senderID) // allow retry on next comment
-	}
-}
-
-// runDedupCleaner evicts stale entries from dedup, adminReplied, and botSentAt
-// maps every dedupCleanEvery to prevent unbounded memory growth.
+// runDedupCleaner evicts stale entries from the in-memory maps every
+// dedupCleanEvery to prevent unbounded memory growth.
 func (ch *Channel) runDedupCleaner() {
 	ticker := time.NewTicker(dedupCleanEvery)
 	defer ticker.Stop()
@@ -304,27 +290,26 @@ func (ch *Channel) runDedupCleaner() {
 		case <-ch.stopCh:
 			return
 		case <-ticker.C:
-			now := time.Now()
-			ch.dedup.Range(func(k, v any) bool {
-				if t, ok := v.(time.Time); ok && now.Sub(t) > dedupTTL {
-					ch.dedup.Delete(k)
-				}
-				return true
-			})
-			ch.adminReplied.Range(func(k, v any) bool {
-				if t, ok := v.(time.Time); ok && now.Sub(t) > adminReplyCooldown {
-					ch.adminReplied.Delete(k)
-				}
-				return true
-			})
-			ch.botSentAt.Range(func(k, v any) bool {
-				if t, ok := v.(time.Time); ok && now.Sub(t) > botEchoWindow {
-					ch.botSentAt.Delete(k)
-				}
-				return true
-			})
+			ch.evictStale(time.Now())
 		}
 	}
+}
+
+// evictStale removes entries older than their map's TTL.
+func (ch *Channel) evictStale(now time.Time) {
+	evict := func(m *sync.Map, ttl time.Duration) {
+		m.Range(func(k, v any) bool {
+			if t, ok := v.(time.Time); ok && now.Sub(t) > ttl {
+				m.Delete(k)
+			}
+			return true
+		})
+	}
+	evict(&ch.dedup, dedupTTL)
+	evict(&ch.adminReplied, adminReplyCooldown)
+	evict(&ch.botSentAt, botEchoWindow)
+	evict(&ch.firstInboxSent, privateReplyWindow)
+	evict(&ch.firstInboxSenderSeen, firstInboxSenderTTL)
 }
 
 // isDup checks and records a dedup key. Returns true if the key was already seen.
