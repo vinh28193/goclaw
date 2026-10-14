@@ -459,3 +459,60 @@ func TestFirstInbox_UnknownCreatedTimeStillSends(t *testing.T) {
 		}
 	}
 }
+
+// D6: the echo of a private reply must not be tracked as an admin reply,
+// otherwise the bot stays silent for 5 minutes when the commenter answers.
+func TestFirstInbox_EchoNotTrackedAsAdmin(t *testing.T) {
+	rec := &graphRecorder{respond: respondPrivateReply(func(w http.ResponseWriter) {
+		_, _ = w.Write([]byte(`{"recipient_id":"psid-1","message_id":"m-1"}`))
+	})}
+	ch := newFirstInboxChannel(t, rec)
+	ch.config.Features.MessengerAutoReply = true
+
+	if err := ch.Send(t.Context(), commentOutbound("111_222", "999")); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	now := time.Now()
+	ch.handleMessagingEvent(WebhookEntry{ID: "111222333"}, MessagingEvent{
+		Sender:    FBUser{ID: "111222333"},
+		Recipient: FBUser{ID: "psid-1"},
+		Timestamp: now.UnixMilli(),
+		Message:   &IncomingMessage{MID: "echo-1", Text: "hi"},
+	})
+	if ch.adminRepliedRecently("psid-1", now) {
+		t.Fatal("private reply echo should not be tracked as admin reply")
+	}
+}
+
+// D6 race mitigation: sender_id is stamped in botSentAt before the Graph call,
+// so an echo arriving before the response is still recognised (when from.id == PSID).
+func TestFirstInbox_PreStoresSenderBeforeSend(t *testing.T) {
+	var ch *Channel
+	var armed atomic.Bool
+	rec := &graphRecorder{respond: respondPrivateReply(func(w http.ResponseWriter) {
+		armed.Store(ch.isBotEcho("999", time.Now()))
+		_, _ = w.Write([]byte(`{}`))
+	})}
+	ch = newFirstInboxChannel(t, rec)
+
+	if err := ch.Send(t.Context(), commentOutbound("111_222", "999")); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if !armed.Load() {
+		t.Fatal("sender_id should be in botSentAt before the private reply request")
+	}
+}
+
+func TestFirstInbox_FailureClearsEchoStamp(t *testing.T) {
+	rec := &graphRecorder{respond: respondPrivateReply(graphErr(400, `{"error":{"code":10903,"message":"privacy"}}`))}
+	ch := newFirstInboxChannel(t, rec)
+	if err := ch.Send(t.Context(), commentOutbound("111_222", "999")); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if ch.isBotEcho("999", time.Now()) {
+		t.Error("echo stamp should be cleared when nothing was delivered")
+	}
+	if _, gated := ch.firstInboxSenderSeen.Load("999"); gated {
+		t.Error("sender gate should be released when nothing was delivered")
+	}
+}
